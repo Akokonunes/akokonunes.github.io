@@ -64,13 +64,13 @@
         <script src="/assets/index/script.js"></script>
 
         <!-- real-time spotify -->
-        <script src="/assets/index/spotifyCurrentlyPlaying.js"></script>
+        <script src="/assets/spotifyCurrentlyPlaying.js"></script>
         <script>
             function updateSong(){
                 getSong(function(artist, title, nowplaying) {
                     if (nowplaying == "true"){
                         $("#live-dot").show();
-                        $("#live-message").text("").show();
+                        $("#live-message").text("Whatever doesn't kill you makes you stronger").show();
                     } else {
                         $("#live-dot").hide();
                         $("#live-message").html("").show();
