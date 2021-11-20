@@ -22,8 +22,8 @@
 
             <!-- image by Hacktivity: https://www.flickr.com/photos/hacktivity/51576099193/in/album-72157719993277298/ -->
             <img src="/assets/index/images/david-square.png" class="profile"/>
-            <p style="font-size: 50px; padding-top: 10px; margin-bottom: 5px">David Schütz</p>
-            <p style="padding-bottom: 5px"><i>security & bug bounty</i></p>
+            <p style="font-size: 50px; padding-top: 10px; margin-bottom: 5px">Roberto Nunes</p>
+            <p style="padding-bottom: 5px"><i>22 y/o BugBounty Hunter, Application security Researcher </i></p>
 
             <div id="spotify" style="padding-bottom: 20px">
                 <div id="ltext">
@@ -70,10 +70,10 @@
                 getSong(function(artist, title, nowplaying) {
                     if (nowplaying == "true"){
                         $("#live-dot").show();
-                        $("#live-message").text("I'm listening now to:").show();
+                        $("#live-message").text("").show();
                     } else {
                         $("#live-dot").hide();
-                        $("#live-message").html("I was listening to:").show();
+                        $("#live-message").html("").show();
                     };
 
                     if (artist.length > 25) {
