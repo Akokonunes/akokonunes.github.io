@@ -1,0 +1,9 @@
+{
+    "url": "https://akokonunes.github.io/swagger/xss.yaml",
+    "urls": [
+        {
+            "url": "https://akokonunes.github.io/swagger/xss.yaml",
+            "name": "Foo"
+        }
+    ]
+}
