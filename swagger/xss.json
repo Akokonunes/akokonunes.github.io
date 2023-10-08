@@ -1,8 +1,8 @@
 {
-    "url": "https://akokonunes.github.io/swagger/xss.yaml",
+    "url": "https://exuberant-ice.surge.sh/test.yaml",
     "urls": [
         {
-            "url": "https://akokonunes.github.io/swagger/xss.yaml",
+            "url": "https://exuberant-ice.surge.sh/test.yaml",
             "name": "Foo"
         }
     ]
