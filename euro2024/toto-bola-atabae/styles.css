@@ -1,0 +1,49 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: url('https://a57.foxsports.com/statics.foxsports.com/www.foxsports.com/content/uploads/2023/12/1280/720/12.02.23_Euro-2024-Groups-Breakdown_16x9.jpg') no-repeat center center fixed;
+    background-size: cover;
+    color: white;
+}
+
+.container {
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 20px;
+    margin: 50px auto;
+    max-width: 800px;
+    border-radius: 10px;
+    text-align: center;
+}
+
+h1 {
+    margin-bottom: 20px;
+    font-size: 2.5em;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+thead {
+    background-color: #444;
+}
+
+th, td {
+    padding: 10px;
+    text-align: center;
+    border: 1px solid #ddd;
+}
+
+tbody tr:nth-child(even) {
+    background-color: #333;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #222;
+}
+
+td[contenteditable="true"] {
+    background-color: #555;
+    color: white;
+}
