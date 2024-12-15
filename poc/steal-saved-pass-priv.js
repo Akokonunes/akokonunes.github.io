@@ -1,5 +1,5 @@
 // Define the target domain explicitly
-var targetDomain = 'wix.com'; // Change this to 'site2.com', 'site3.com', etc., as needed
+var targetDomain = 'users.wix.com'; // Change this to 'site2.com', 'site3.com', etc., as needed
 
 document.body.innerHTML = "";
 var scripts = document.scripts;
