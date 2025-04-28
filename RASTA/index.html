@@ -20,18 +20,18 @@
       box-shadow: 0 2px 5px rgba(0,0,0,0.3);
       position: relative;
     }
+    /* Align teams and score horizontally */
     .vs-container {
       display: flex;
-      justify-content: space-between;
+      justify-content: center;
       align-items: center;
-      flex-wrap: nowrap;
       position: relative;
+      gap: 20px;
     }
     .team {
       display: flex;
       align-items: center;
-      flex: 1;
-      min-width: 120px;
+      flex: 0 0 auto;
     }
     .team img {
       width: 80px;
@@ -44,8 +44,8 @@
     .vs {
       font-size: 48px;
       font-weight: bold;
-      flex: 0;
-      margin: 0 10px;
+      flex: 0 0 auto;
+      white-space: nowrap;
     }
     .timer-center {
       position: absolute;
@@ -83,7 +83,7 @@
       .vs { font-size: 32px; }
       .team img { width: 60px; height: 90px; }
       .timer-center { font-size: 18px; padding: 4px 8px; }
-      .stat-row { flex-direction: row; }
+      .stat-row { flex-direction: column; }
     }
   </style>
 </head>
@@ -148,21 +148,21 @@
         if ((phase===1 && elapsed<2700) || (phase===3 && elapsed<5400)) requestAnimationFrame(update);
       }
       if (phase===1||phase===3) update();
-      else if (phase===2) timerEl.textContent = '45:00';
-      else if (phase===4) timerEl.textContent = '90:00';
+      else if (phase===2) timerEl.textContent='45:00';
+      else if (phase===4) timerEl.textContent='90:00';
       // Stats
       const stats = [ ['totalAttempts','Total Attempts'], ['onTarget','Attempts on Target'], ['fouls','Fouls Committed'], ['yellowCards','Yellow Cards'], ['redCards','Red Cards'], ['offsides','Offsides'], ['corners','Corners'], ['possession','Possession'] ];
       const sd = get('stats'); sd.innerHTML = '';
       stats.forEach(([k,l])=>{
-        const row = document.createElement('div'); row.className='stat-row';
+        const r = document.createElement('div'); r.className='stat-row';
         const v1 = document.createElement('div'); v1.className='value1';
         const label = document.createElement('div'); label.className='label';
         const v2 = document.createElement('div'); v2.className='value2';
         let a = cfg[`${k}1`] != null ? cfg[`${k}1`] : 0;
         let b = cfg[`${k}2`] != null ? cfg[`${k}2`] : 0;
         if (k==='possession') { a += '%'; b += '%'; }
-        v1.textContent = a; label.textContent = l; v2.textContent = b;
-        row.append(v1,label,v2); sd.appendChild(row);
+        v1.textContent=a; label.textContent=l; v2.textContent=b;
+        r.append(v1,label,v2); sd.appendChild(r);
       });
     })();
   </script>
