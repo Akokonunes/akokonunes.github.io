@@ -1,0 +1,123 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Live Match Statistics</title>
+  <style>
+    body { margin:0; font-family: Arial, sans-serif; background:#e0e0e0; }
+    .header { background: #fff; color: #000; text-align: center; padding: 20px 0; }
+    .header h1 { margin: 0; font-size: 36px; color: #000; }
+    .header .sub { font-size: 16px; margin-top: 5px; color: #333; }
+    .scoreboard {
+      background: url('https://img.freepik.com/free-photo/doing-sport-concept_23-2151937746.jpg') no-repeat center center;
+      background-size: cover;
+      margin: 20px auto;
+      padding: 20px;
+      width: 800px;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+      position: relative;
+    }
+    .team { display: flex; align-items: center; width: 250px; }
+    .team img { width:110px; height:150px; margin-right:10px; border-radius:50% / 50%; object-fit:cover; background:#fff; }
+    .vs-container { display:flex; justify-content: space-between; align-items:center; position:relative; }
+    .vs { font-size: 48px; font-weight: bold; }
+    .timer-center { position:absolute; top:-30px; left:50%; transform:translateX(-50%); font-size:24px; background: #000;
+      color:#fff; padding:6px 12px; border-radius:5px; }
+    /* New timer above scores */
+    .timer-above { text-align:center; font-size:20px; color:#000; background: #fff; display:inline-block;
+      padding:4px 8px; border-radius:4px; position:relative; left:50%; transform:translateX(-50%); margin:10px 0; }
+    .match-time { text-align:center; font-size:18px; margin:5px 0; color:#000; }
+    .scorers { text-align:center; font-size:14px; margin-bottom:15px; }
+    .stats { margin-top: 20px; }
+    .stat-row { display: flex; justify-content: space-between; align-items: center; background: #283593; margin:5px 0;
+      padding: 10px; border-radius: 20px; color: white; }
+    .stat-row .value1 { width: 60px; text-align:center; font-weight:bold; color: #2196F3; }
+    .stat-row .value2 { width: 60px; text-align:center; font-weight:bold; color: #F44336; }
+    .stat-row .label { flex:1; text-align:center; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1 id="title">MATCH STATISTICS</h1>
+    <div class="sub" id="datetime"></div>
+    <div class="sub" id="group"></div>
+  </div>
+  <div class="scoreboard">
+    <div class="vs-container">
+      <div class="team">
+        <img id="flag1" src="" alt="Team 1 Flag">
+        <span id="team1">TEAM 1</span>
+      </div>
+      <div class="vs">
+        <span id="score1">0</span> : <span id="score2">0</span>
+      </div>
+      <div class="team" style="justify-content:flex-end;">
+        <span id="team2">TEAM 2</span>
+        <img id="flag2" src="" alt="Team 2 Flag">
+      </div>
+      <div class="timer-center" id="timer">00:00</div>
+    </div>
+    <!-- New timer above scores -->
+    <div class="timer-above" id="timerAbove">00:00</div>
+    <div class="match-time" id="matchInfo"></div>
+    <div class="scorers">
+      <div id="scorers1"></div>
+      <div id="scorers2"></div>
+    </div>
+    <div class="stats" id="stats"></div>
+  </div>
+<script>
+(function(){
+  let cfg = {};
+  try { cfg = JSON.parse(localStorage.getItem('matchConfig') || '{}'); } catch(e) {}
+  const get = id => document.getElementById(id);
+  get('title').textContent = cfg.title || 'MATCH STATISTICS';
+  get('group').textContent = cfg.group || '';
+  get('team1').textContent = cfg.team1Name || 'TEAM 1';
+  get('team2').textContent = cfg.team2Name || 'TEAM 2';
+  get('flag1').src = cfg.team1Flag || '';
+  get('flag2').src = cfg.team2Flag || '';
+  get('score1').textContent = cfg.team1Score || 0;
+  get('score2').textContent = cfg.team2Score || 0;
+  const s1 = get('score1').textContent;
+  const s2 = get('score2').textContent;
+  const stats = [ ['totalAttempts','Total Attempts'], ['onTarget','Attempts on Target'], ['fouls','Fouls Committed'], ['yellowCards','Yellow Cards'], ['redCards','Red Cards'], ['offsides','Offsides'], ['corners','Corners'], ['possession','Possession'] ];
+  const sd = get('stats'); sd.innerHTML = '';
+  stats.forEach(([k,l])=>{
+    const r = document.createElement('div'); r.className='stat-row';
+    const v1 = document.createElement('div'); v1.className='value1';
+    const v2 = document.createElement('div'); v2.className='value2';
+    const lb = document.createElement('div'); lb.className='label';
+    let a = cfg[`${k}1`] != null ? cfg[`${k}1`] : 0;
+    let b = cfg[`${k}2`] != null ? cfg[`${k}2`] : 0;
+    if(k==='possession'){ a += '%'; b += '%'; }
+    v1.textContent = a;
+    lb.textContent = l;
+    v2.textContent = b;
+    r.append(v1, lb, v2);
+    sd.appendChild(r);
+  });
+  ['scorers1','scorers2'].forEach((id,i)=>{
+    const arr = JSON.parse(localStorage.getItem(id) || '[]');
+    const el = get(id);
+    if(arr.length) el.textContent = `${cfg[i?'team2Name':'team1Name'] || 'Team'} Scorers: ` +
+      arr.map(s=>`${s.name}${s.min?` (${s.min}')`:''}`).join(', ');
+  });
+  let p = +localStorage.getItem('halfPhase') || 0;
+  let st = +localStorage.getItem('startTs') || 0;
+  const te = get('timer'), ta = get('timerAbove');
+  function upd(){
+    const elapsed = Math.min((Date.now()-st)/1000, p===1?2700 : p===3?5400 : 0);
+    const mm = String(Math.floor(elapsed/60)).padStart(2,'0');
+    const ss = String(Math.floor(elapsed%60)).padStart(2,'0');
+    te.textContent = `${mm}:${ss}`;
+    ta.textContent = `${mm}:${ss}`;
+    if((p===1&&elapsed<2700)||(p===3&&elapsed<5400)) requestAnimationFrame(upd);
+  }
+  if(p===1||p===3) upd(); else if(p===2){ te.textContent=ta.textContent='45:00'; } else if(p===4){ te.textContent=ta.textContent=''; }
+})();
+</script>
+
+<!-- setup.html remains unchanged -->
