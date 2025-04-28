@@ -1,0 +1,54 @@
+<!-- setup.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Setup Match Stats</title>
+  <style>body{font-family:Arial,sans-serif;margin:20px;}form{max-width:600px;margin:auto;}label{display:block;margin-top:15px;font-weight:bold;}input{width:100%;padding:8px;margin-top:5px;box-sizing:border-box;}button{margin:10px 5px 0 0;padding:10px 20px;font-size:16px;}</style>
+</head>
+<body>
+  <h2>Setup Match Statistics</h2>
+  <form id="setupForm">
+    <label>Title<input type="text" name="title" placeholder="Title"></label>
+    <label>Date<input type="text" name="date" placeholder="15 August 2018"></label>
+    <label>Time<input type="text" name="time" placeholder="04:45 PM"></label>
+    <label>Stadium<input type="text" name="stadium" placeholder="Stadium"></label>
+    <label>Group<input type="text" name="group" placeholder="Group"></label>
+    <label>Team 1 Name<input type="text" name="team1Name" placeholder="Team 1 Name"></label>
+    <label>Team 1 Flag URL<input type="text" name="team1Flag" placeholder="C:\\Bug Bounty\\RASTA\\rasta.jpg"></label>
+    <label>Team 1 Score<input type="number" name="team1Score" placeholder="0" min="0"></label>
+    <label>Team 2 Name<input type="text" name="team2Name" placeholder="Team 2 Name"></label>
+    <label>Team 2 Flag URL<input type="text" name="team2Flag" placeholder="C:\\Bug Bounty\\RASTA\\estrela.jpg"></label>
+    <label>Team 2 Score<input type="number" name="team2Score" placeholder="0" min="0"></label>
+    <label>Total Attempts Team 1<input type="number" name="totalAttempts1" placeholder="0" min="0"></label>
+    <label>Total Attempts Team 2<input type="number" name="totalAttempts2" placeholder="0" min="0"></label>
+    <label>Attempts on Target Team 1<input type="number" name="onTarget1" placeholder="0" min="0"></label>
+    <label>Attempts on Target Team 2<input type="number" name="onTarget2" placeholder="0" min="0"></label>
+    <label>Fouls Committed Team 1<input type="number" name="fouls1" placeholder="0" min="0"></label>
+    <label>Fouls Committed Team 2<input type="number" name="fouls2" placeholder="0" min="0"></label>
+    <label>Yellow Cards Team 1<input type="number" name="yellowCards1" placeholder="0" min="0"></label>
+    <label>Yellow Cards Team 2<input type="number" name="yellowCards2" placeholder="0" min="0"></label>
+    <label>Red Cards Team 1<input type="number" name="redCards1" placeholder="0" min="0"></label>
+    <label>Red Cards Team 2<input type="number" name="redCards2" placeholder="0" min="0"></label>
+    <label>Offsides Team 1<input type="number" name="offsides1" placeholder="0" min="0"></label>
+    <label>Offsides Team 2<input type="number" name="offsides2" placeholder="0" min="0"></label>
+    <label>Corners Team 1<input type="number" name="corners1" placeholder="0" min="0"></label>
+    <label>Corners Team 2<input type="number" name="corners2" placeholder="0" min="0"></label>
+    <label>Possession Team 1 (% )<input type="number" name="possession1" placeholder="50" min="0" max="100"></label>
+    <label>Possession Team 2 (% )<input type="number" name="possession2" placeholder="50" min="0" max="100"></label>
+    <button type="button" id="saveBtn">Save Config</button>
+    <button type="button" id="startBtn">Start Match</button>
+    <button type="button" id="endHalfBtn">End First Half</button>
+    <button type="button" id="secondStartBtn">Start Second Half</button>
+    <button type="button" id="endMatchBtn">End Match</button>
+    <button type="button" id="addScorer1Btn">Add Scorer Team 1</button>
+    <button type="button" id="addScorer2Btn">Add Scorer Team 2</button>
+  </form>
+<script>(function(){const f=document.getElementById('setupForm');const cfg=JSON.parse(localStorage.getItem('matchConfig')||'{}');Object.entries(cfg).forEach(([k,v])=>{if(f[k])f[k].value=v;});
+ document.getElementById('saveBtn').onclick=()=>{const d={};new FormData(f).forEach((v,k)=>d[k]=v);localStorage.setItem('matchConfig',JSON.stringify(d));alert('Configuration saved');};
+ document.getElementById('startBtn').onclick=()=>{localStorage.setItem('startTs',Date.now());localStorage.setItem('halfPhase','1');alert('Match started');};
+ document.getElementById('endHalfBtn').onclick=()=>{localStorage.setItem('halfPhase','2');alert('First half ended');};
+ document.getElementById('secondStartBtn').onclick=()=>{localStorage.setItem('startTs',Date.now()-2700*1000);localStorage.setItem('halfPhase','3');alert('Second half started');};
+ document.getElementById('endMatchBtn').onclick=()=>{localStorage.setItem('halfPhase','4');alert('Match ended');};
+ ['addScorer1Btn','addScorer2Btn'].forEach((id,i)=>{document.getElementById(id).onclick=()=>{const team=f[i?'team2Name':'team1Name'].value||`Team ${i+1}`,name=prompt(`Enter scorer name for ${team}:`);if(!name)return;const m=prompt('Enter minute (optional):');const arr=JSON.parse(localStorage.getItem(`scorers${i+1}`)||'[]');arr.push({name,min:m});localStorage.setItem(`scorers${i+1}`,JSON.stringify(arr));alert('Scorer saved');};});
+})();</script>
