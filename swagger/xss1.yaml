@@ -1,0 +1,6 @@
+openapi: 3.0.0
+info:
+  title: "<img src=x onerror=alert(document.domain)>"
+  description: "<form><math><mtext></form><form><mglyph><svg><mtext><textarea><path id="</textarea><img onerror=alert('XSS') src=1>"></form>"
+  version: "1.0.0"
+paths: {}
