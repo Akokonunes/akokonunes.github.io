@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Blind XSS Lab - Submit</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 30px; }
+        input, textarea { display: block; margin: 10px 0; width: 300px; }
+        label { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Submit Comment (Blind XSS Demo)</h1>
+    <form id="commentForm">
+        <label for="name">Name:</label>
+        <input name="name" id="name" type="text" required>
+
+        <label for="comment">Comment:</label>
+        <textarea name="comment" id="comment" required></textarea>
+
+        <button type="submit">Submit</button>
+    </form>
+    <div id="message"></div>
+    <hr>
+    <p>
+      <b>Note:</b> After submitting, open <code>admin.html</code> in another tab or device to view comments as an "admin" and trigger any blind XSS payloads.
+    </p>
+
+    <script>
+    // Store comments in localStorage for demo
+    const form = document.getElementById('commentForm');
+    const message = document.getElementById('message');
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const name = form.name.value;
+        const comment = form.comment.value;
+
+        // Get existing or create new array
+        let comments = JSON.parse(localStorage.getItem('comments') || "[]");
+        comments.push({ name, comment, time: new Date().toISOString() });
+        localStorage.setItem('comments', JSON.stringify(comments));
+
+        message.innerHTML = '<b>Comment submitted!</b> Now view <code>admin.html</code> as admin.';
+        form.reset();
+    });
+    </script>
+</body>
+</html>
