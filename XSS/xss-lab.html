@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Blind XSS Test Lab</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 30px; }
+        input, textarea { display: block; margin: 10px 0; width: 300px; }
+        label { font-weight: bold; }
+        .result { margin: 20px 0; padding: 10px; background: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <h1>Blind XSS Vulnerable Lab</h1>
+    <form method="POST">
+        <label for="name">Name:</label>
+        <input name="name" id="name" type="text">
+
+        <label for="email">Email:</label>
+        <input name="email" id="email" type="email">
+
+        <label for="comment">Comment:</label>
+        <textarea name="comment" id="comment"></textarea>
+
+        <!-- Hidden vector -->
+        <input type="hidden" name="hidden" value="">
+
+        <button type="submit">Submit</button>
+    </form>
+    <hr>
+
+    <h2>Reflected Output</h2>
+    <div class="result" id="output"></div>
+
+    <script>
+    // Get form and output div
+    const form = document.querySelector('form');
+    const output = document.getElementById('output');
+
+    // Function to render user input directly (vulnerable!)
+    function renderInput(data) {
+        let html = '';
+        for (const key in data) {
+            html += `<b>${key}:</b> ${data[key]}<br>`;
+        }
+        output.innerHTML = html;
+    }
+
+    // On form submit: prevent real submission, reflect data to output
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const data = {};
+        for (let el of form.elements) {
+            if (el.name) data[el.name] = el.value;
+        }
+        renderInput(data);
+    });
+
+    // Optionally: Render GET params if present (simulate reflected XSS via URL)
+    window.addEventListener('DOMContentLoaded', () => {
+        const params = new URLSearchParams(window.location.search);
+        if ([...params.keys()].length > 0) {
+            renderInput(Object.fromEntries(params.entries()));
+        }
+    });
+    </script>
+</body>
+</html>
