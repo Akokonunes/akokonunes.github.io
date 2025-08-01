@@ -12,6 +12,7 @@
 <body>
     <h1>Admin Panel: View User Comments</h1>
     <div id="comments"></div>
+    <button onclick="localStorage.removeItem('comments'); location.reload();">Delete All Comments</button>
     <hr>
     <p>
       <b>Instructions:</b> If a user submitted a blind XSS payload, it will execute here as the "admin" is viewing it.
