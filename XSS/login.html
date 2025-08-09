@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Blind XSS Lab – Login</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 30px; max-width: 520px; }
+    input { display:block; width:100%; padding:8px; margin:10px 0; }
+    button { padding:10px 16px; }
+    .hint { color:#666; font-size:13px; }
+  </style>
+</head>
+<body>
+  <h1>Admin Login</h1>
+  <form id="loginForm">
+    <label>Username</label>
+    <input name="u" required autofocus />
+    <label>Password</label>
+    <input name="p" type="password" required />
+    <button type="submit">Sign in</button>
+  </form>
+  <p class="hint">Use <b>test</b> / <b>test</b></p>
+
+  <script>
+    const form = document.getElementById('loginForm');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const u = form.u.value.trim();
+      const p = form.p.value;
+      if (u === 'test' && p === 'test') {
+        localStorage.setItem('bxss_auth', JSON.stringify({ user: u, at: Date.now() }));
+        // if there is a return URL, go there; else admin
+        const ret = new URL(location.href).searchParams.get('return') || 'admin.html';
+        location.href = ret;
+      } else {
+        alert('Invalid credentials.');
+      }
+    });
+  </script>
+</body>
+</html>
