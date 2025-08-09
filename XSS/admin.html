@@ -1,38 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Blind XSS Lab - Admin</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 30px; }
-        .comment { margin-bottom: 20px; background: #f9f9f9; padding: 10px; border-radius: 4px; }
-        .meta { color: #666; font-size: 13px; }
-    </style>
+  <meta charset="UTF-8" />
+  <title>Blind XSS Lab – Login</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 30px; max-width: 520px; }
+    input { display:block; width:100%; padding:8px; margin:10px 0; }
+    button { padding:10px 16px; }
+    .hint { color:#666; font-size:13px; }
+  </style>
 </head>
 <body>
-    <h1>Admin Panel: View User Comments</h1>
-    <div id="comments"></div>
-    <button onclick="localStorage.removeItem('comments'); location.reload();">Delete All Comments</button>
-    <hr>
-    <p>
-      <b>Instructions:</b> If a user submitted a blind XSS payload, it will execute here as the "admin" is viewing it.
-    </p>
+  <h1>Admin Login</h1>
+  <form id="loginForm">
+    <label>Username</label>
+    <input name="u" required autofocus />
+    <label>Password</label>
+    <input name="p" type="password" required />
+    <button type="submit">Sign in</button>
+  </form>
+  <p class="hint">Use <b>test</b> / <b>test</b></p>
 
-    <script>
-    // Load comments from localStorage
-    function showComments() {
-        let comments = JSON.parse(localStorage.getItem('comments') || "[]");
-        let html = '';
-        for (const c of comments) {
-            html += `<div class="comment">
-                <div class="meta">Time: ${c.time}<br>Name: ${c.name}</div>
-                <div><b>Comment:</b> ${c.comment}</div>
-            </div>`;
-        }
-        document.getElementById('comments').innerHTML = html;
-    }
-
-    showComments();
-    </script>
+  <script>
+    const form = document.getElementById('loginForm');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const u = form.u.value.trim();
+      const p = form.p.value;
+      if (u === 'test' && p === 'test') {
+        localStorage.setItem('bxss_auth', JSON.stringify({ user: u, at: Date.now() }));
+        // if there is a return URL, go there; else admin
+        const ret = new URL(location.href).searchParams.get('return') || 'admin.html';
+        location.href = ret;
+      } else {
+        alert('Invalid credentials.');
+      }
+    });
+  </script>
 </body>
 </html>
