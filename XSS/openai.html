@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Security Scanner – OpenAI Key Exposure Tests (ALL FAKE)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 2rem; line-height: 1.5; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    pre { background: #f6f8fa; padding: 1rem; border-radius: 8px; overflow-x: auto; }
+    .muted { color: #666; }
+    .pill { display:inline-block; padding: .15rem .5rem; border:1px solid #ddd; border-radius: 999px; font-size: .8rem; margin-left: .5rem; }
+  </style>
+</head>
+<body>
+  <h1>FAKE OpenAI keys for scanner validation</h1>
+  <p class="muted">
+    This page deliberately includes <em>synthetic</em> strings that look like OpenAI keys so you can validate detection rules before merging.
+    <strong>Never</strong> publish real secrets in client-side HTML.
+  </p>
+
+  <!-- Simple markers to assist scanners -->
+  <div data-testid="openai-admin-api-key-test" data-leak="openai-admin-api-key"></div>
+  <div data-testid="openai-service-account-api-key-test" data-leak="openai-service-account-api-key"></div>
+
+  <h2>Admin key pattern <span class="pill">non-functional</span></h2>
+  <pre id="exposure-admin">
+openai-admin-api-key: sk-admin-n1-FAKErUY48eCrmq7tAOE3E38rIJjWQDzjAN9atp1VYUBtM3HuQYLSHB09WmpT3BLbkFJVy5d6Pi5jwkIurBxEwSX2EtbUsHT50yqUkhEOoriKL6TeYgjbVnD1LkcA
+  </pre>
+
+  <h2>Service account key pattern <span class="pill">non-functional</span></h2>
+  <pre id="exposure-svcacct">
+openai-service-account-api-key: sk-svcacct-FAKEKogknR62vxBwRIQilJt43VzBLHM7za8o7gPQpDkFIEQ-9ORO2yiR12-XfBdS-f4_l5zaoKeGVGT3BLbkFJ8tkhoag3eJ5mKyZVEaZBDNf6-48LH4MRh3PpBQk1uNNlhwQb4puNJbDFJbFrK9yMrzb9QDEE4A
+  </pre>
+
+  <p class="muted">
+    Both strings are crafted to look realistic for pattern matching but are <strong>invalid</strong> and cannot be used for authentication.
+  </p>
+
+  <h2>Optional variants (for robust tests)</h2>
+  <pre>
+"openai-admin-api-key" = "sk-admin-n1-FAKE7Jpqs1o7jU8nD3bK4e5f6g7h8i9j0AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPp"
+"openai-service-account-api-key" = "sk-svcacct-FAKEpQ3rStUvWxYz0123456789ABCDEFGHabcdefghJKLmnoPQRstuVWXyz"
+<!-- openai-admin-api-key: sk-admin-n1-FAKEpQ3rStUvWxYz0123456789ABCDEFGHabcdefghJKLmnoPQRstuVWXyz -->
+<!-- openai-service-account-api-key: sk-svcacct-FAKExxYyZz0123456789AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRr -->
+  </pre>
+
+  <footer class="muted">
+    Host this file at any path (e.g., <code>/test.html</code>) and point your scanner at it.
+  </footer>
+</body>
+</html>
