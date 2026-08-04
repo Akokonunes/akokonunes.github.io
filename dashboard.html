@@ -1,0 +1,1310 @@
+<!doctype html>
+<!--
+═══════════════════════════════════════════════════════════════════════════
+  MAIL AUTO SIGNUP v1 — dashboard for the myfoti.com catch-all mailbox
+═══════════════════════════════════════════════════════════════════════════
+
+  WHAT THIS FILE IS
+  A single self-contained dashboard for a catch-all e-mail domain used to
+  create and manage throwaway accounts during authorized bug-bounty testing.
+  Open it in a browser from disk — no server, no build, no dependencies.
+  It is only a UI; all state lives in the HTTP API below.
+
+  ───────────────────────────────────────────────────────────────────────
+  IF YOU ARE AN AI AGENT AND THIS FILE WAS PASTED TO YOU
+  ───────────────────────────────────────────────────────────────────────
+  Do NOT try to run, open, or render this file — you are in a sandbox and
+  cannot use a browser profile. Instead call the HTTP API directly with
+  curl/fetch. Everything the dashboard does is one of these calls.
+
+    BASE  = https://myfoti-mail.myfoti-mail.workers.dev
+    TOKEN = 71bbcdf4e4f3bc29ef943cd4217f3d19ccbd0377054d6f5b9454f89b78d723c9
+    AUTH  = "Authorization: Bearer $TOKEN"        (every call except /health)
+
+  Every address *@myfoti.com already receives mail, permanently, without
+  being created first. Invent one and use it.
+
+    Mint an identity (email + password, recorded in the ledger):
+      curl -s -X POST -H "$AUTH" "$BASE/new?target=<host>"
+
+    Wait for a verification code — numeric (483920), split (704 812) and
+    alphanumeric (GNN93Y) are all extracted automatically:
+      curl -s -H "$AUTH" "$BASE/code/<email>?wait=25&since=$(date +%s000)"
+        {"found":true,"code":"483920"}           -> use it
+        {"found":false}                          -> NOT an error. Poll again.
+                                                    Each call blocks max 25s;
+                                                    loop to your own deadline
+                                                    (240s is sane).
+        {"found":true,"code":null,"body":"..."}  -> mail arrived, nothing
+                                                    matched. Read "body", then
+                                                    retry with &pattern=<regex>
+                                                    whose group 1 is the code.
+
+    Magic / confirmation links:
+      curl -s -H "$AUTH" "$BASE/links/<email>?wait=25&filter=verify"
+
+    Everything received, across all addresses, codes pre-extracted:
+      curl -s -H "$AUTH" "$BASE/recent?limit=50"
+
+    Other endpoints:
+      GET    $BASE/health                       liveness, no auth
+      GET    $BASE/inbox/<email>?limit=10       messages for one address
+      GET    $BASE/message/<id>?raw=1           one message incl. raw MIME
+      GET    $BASE/creds?target=<substr>        every identity + password
+      POST   $BASE/assign  {addrs:[],program,target}   bulk re-group
+      DELETE $BASE/identity/<email>[?purge=1]   forget a credential
+      DELETE $BASE/inbox/<email>                purge stored mail
+
+    `since` = epoch MILLISECONDS captured just before you submitted the form,
+    so you never match an older message.
+
+  ───────────────────────────────────────────────────────────────────────
+  RULES THAT MATTER (they cost real accounts when ignored)
+  ───────────────────────────────────────────────────────────────────────
+  1. Confirm the bug-bounty program permits self-registration BEFORE
+     creating accounts. Reachability is not permission.
+  2. If a target rejects @myfoti.com, STOP. Do not retry with another
+     localpart or a plus-tag. Every retry accelerates blocklisting, and if
+     the domain is burned then every existing account on it becomes
+     unrecoverable — no password resets, ever.
+  3. Never resubmit a signup form because mail is slow. Wait, or use the
+     target's own "resend" control. Duplicate submissions look like abuse.
+  4. Verification links are usually SINGLE-USE. Do not fetch one "to check"
+     and then open it in a browser — the first fetch burns it.
+  5. Max ~1 signup per minute per target.
+  6. This is email-only. There is NO SMS capability; if a flow requires a
+     phone code you cannot finish it.
+
+  Passwords are stored in plaintext and the token above grants read access
+  to every inbox. Disposable test accounts only.
+
+  Companion files: mailtool.py (same features as a CLI),
+  MASTER_PROMPT.md (full NEO + Browserbase signup automation prompt).
+═══════════════════════════════════════════════════════════════════════════
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MAIL AUTO SIGNUP — myfoti.com</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#151b23; --panel2:#1c232d; --line:#2a3441;
+    --fg:#e6edf3; --dim:#8b949e; --faint:#5a6672;
+    --accent:#4dd4ac; --accent2:#58a6ff; --warn:#e3b341; --bad:#f85149;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#f6f8fa; --panel:#fff; --panel2:#f0f3f6; --line:#d6dde5;
+           --fg:#1f2328; --dim:#5a6672; --faint:#8b949e; --accent:#0f8a68; --accent2:#0969da; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+  code,kbd,.mono{font-family:var(--mono)}
+
+  /* ---------- header ---------- */
+  header{display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+         padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+  .logo{font-family:var(--mono);font-weight:700;letter-spacing:.5px;white-space:nowrap}
+  .logo b{color:var(--accent)}
+  .meta{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--dim)}
+  .meta b{color:var(--fg);font-family:var(--mono)}
+  .spacer{flex:1}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--faint);
+       margin-right:6px;vertical-align:1px}
+  .dot.ok{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+  .dot.bad{background:var(--bad)}
+
+  /* ---------- layout ---------- */
+  main{display:grid;grid-template-columns:250px 1fr;gap:0;min-height:calc(100vh - 58px)}
+  @media(max-width:820px){ main{grid-template-columns:1fr} aside{border-right:0!important;
+    border-bottom:1px solid var(--line)} }
+  aside{background:var(--panel);border-right:1px solid var(--line);padding:14px;overflow:auto}
+  section{padding:18px 20px;overflow:auto}
+
+  h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);
+     margin:0 0 10px;font-weight:600}
+  h3{font-size:15px;margin:0 0 12px}
+
+  /* ---------- controls ---------- */
+  button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line);
+         background:var(--panel2);color:var(--fg);padding:7px 13px;transition:.12s}
+  button:hover{border-color:var(--accent);color:var(--accent)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#04120d;font-weight:600}
+  button.primary:hover{filter:brightness(1.12);color:#04120d}
+  button.ghost{background:transparent}
+  button.danger:hover{border-color:var(--bad);color:var(--bad)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.sm{padding:3px 9px;font-size:12px}
+  input,select,textarea{font:inherit;width:100%;padding:8px 10px;border-radius:6px;
+    border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+  input:focus,textarea:focus{outline:none;border-color:var(--accent2)}
+  label{display:block;font-size:12px;color:var(--dim);margin:10px 0 4px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+  /* ---------- service list ---------- */
+  .svc{display:flex;justify-content:space-between;align-items:center;gap:8px;
+       padding:7px 10px;border-radius:6px;cursor:pointer;font-size:13px}
+  .svc:hover{background:var(--panel2)}
+  .svc.on{background:var(--panel2);box-shadow:inset 2px 0 0 var(--accent)}
+  .svc .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .svc .c{color:var(--faint);font-size:11px;font-family:var(--mono)}
+
+  /* ---------- cards / table ---------- */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+        padding:16px;margin-bottom:16px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
+  .acct{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px;
+        cursor:pointer;transition:.12s}
+  .acct:hover{border-color:var(--accent2)}
+  .acct.sel{border-color:var(--accent);background:var(--panel2)}
+  .cb{width:16px;height:16px;flex:0 0 auto;accent-color:var(--accent);cursor:pointer;margin-top:2px}
+  .tag.prog{background:var(--accent);color:#04120d;font-weight:700;letter-spacing:.04em}
+  .svc.prog .n{font-weight:600}
+  .bulkbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;
+    padding:10px 14px;border-radius:10px;background:var(--panel2);
+    border:1px solid var(--accent)}
+  .acct .em{font-family:var(--mono);font-size:13px;color:var(--accent2);word-break:break-all}
+  .acct .pw{font-family:var(--mono);font-size:12px;color:var(--dim);word-break:break-all}
+  .acct .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:99px;
+             background:var(--panel2);color:var(--dim);margin-top:6px}
+
+  .kv{display:grid;grid-template-columns:92px 1fr;gap:6px 12px;font-size:13px;align-items:center}
+  .kv .k{color:var(--faint);font-size:12px}
+  .kv .v{font-family:var(--mono);word-break:break-all}
+
+  pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;
+      overflow:auto;font-size:12px;margin:0;max-height:420px;white-space:pre-wrap;word-break:break-word}
+
+  .msg{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;
+       cursor:pointer;background:var(--panel)}
+  .msg:hover{border-color:var(--accent2)}
+  .msg .s{font-weight:600;font-size:13px}
+  .msg .f{font-size:11px;color:var(--faint);font-family:var(--mono);word-break:break-all}
+
+  .code-hit{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--accent);
+            letter-spacing:3px;padding:14px 0}
+
+  /* ---------- recent-mail feed ---------- */
+  .feedrow{display:flex;gap:14px;align-items:flex-start;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:8px}
+  .feedrow:hover{border-color:var(--accent2)}
+  .fr-main{flex:1;min-width:0;cursor:pointer}
+  .fr-main .s{font-weight:600;font-size:13px}
+  .fr-main .f{font-size:11px;color:var(--faint);font-family:var(--mono);
+    word-break:break-all;margin-top:2px}
+  .fr-main .note{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;
+    -webkit-box-orient:vertical}
+  .fr-side{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
+  .fr-side .when{font-size:11px;color:var(--faint);white-space:nowrap}
+  .codebtn{font-family:var(--mono);font-size:16px;font-weight:700;letter-spacing:1.5px;
+    color:#04120d;background:var(--accent);border-color:var(--accent);padding:4px 12px}
+  .codebtn:hover{filter:brightness(1.12);color:#04120d}
+  .empty{color:var(--faint);font-size:13px;padding:24px;text-align:center}
+  .note{font-size:12px;color:var(--dim);line-height:1.65}
+  .warn{color:var(--warn)} .bad{color:var(--bad)} .ok{color:var(--accent)}
+
+  /* ---------- modal ---------- */
+  .mask{position:fixed;inset:0;background:#000a;display:none;align-items:center;
+        justify-content:center;padding:20px;z-index:50}
+  .mask.on{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+         padding:20px;max-width:880px;width:100%;max-height:90vh;overflow:auto}
+  .mailframe{width:100%;height:58vh;min-height:320px;border:1px solid var(--line);
+    border-radius:8px;background:#fff;display:block}
+
+  /* ---------- toast ---------- */
+  #toast{position:fixed;bottom:18px;right:18px;z-index:99;display:flex;
+         flex-direction:column;gap:8px}
+  .t{background:var(--panel);border:1px solid var(--accent);border-radius:8px;
+     padding:9px 14px;font-size:13px;box-shadow:0 6px 20px #0006}
+  .t.bad{border-color:var(--bad)}
+
+  .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--line);
+        border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;
+        vertical-align:-2px;margin-right:8px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">MAIL <b>AUTO SIGNUP</b> <span style="color:var(--faint)">v1</span></div>
+  <div class="meta">
+    <span>domain <b id="mDomain">—</b></span>
+    <span>password <b id="mPass">—</b> <button class="sm ghost" onclick="copy(PASSWORD)">copy</button></span>
+    <span><span class="dot" id="mDot"></span><span id="mHealth">checking…</span></span>
+    <span>accounts <b id="mCount">0</b></span>
+  </div>
+  <div class="spacer"></div>
+  <div class="row">
+    <button class="primary" onclick="openNew()">+ New account</button>
+    <button onclick="openRegister()">Register existing</button>
+    <button class="ghost" onclick="openHelp()" title="How to use">? Help</button>
+    <button class="ghost" onclick="openSettings()">⚙</button>
+    <button class="ghost" onclick="load()">↻</button>
+  </div>
+</header>
+
+<main>
+  <aside>
+    <h2>Services</h2>
+    <input id="svcSearch" placeholder="filter…" oninput="renderServices()" style="margin-bottom:10px">
+    <div id="svcList"></div>
+  </aside>
+
+  <section>
+    <div id="view"></div>
+  </section>
+</main>
+
+<div class="mask" id="mask" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal"></div>
+</div>
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════
+//  CONFIG — hardcoded, overridable in ⚙ (stored in localStorage)
+// ══════════════════════════════════════════════════════════════════════
+const DEFAULTS = {
+  base:   "https://myfoti-mail.myfoti-mail.workers.dev",
+  token:  "71bbcdf4e4f3bc29ef943cd4217f3d19ccbd0377054d6f5b9454f89b78d723c9",
+  domain: "myfoti.com",
+  // Same fixed password as mailtool.py — constant so an account is never lost.
+  password: "Bb-Myf0ti#2026!",
+};
+const cfg = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem("myfoti") || "{}"));
+let PASSWORD = cfg.password;
+
+const POLL_WAIT = 25;      // server long-poll cap, seconds
+const POLL_TOTAL = 240;    // our own deadline, seconds
+
+let CREDS = [];            // all identities
+let SVC = "__all__";       // current view: __all__ | __recent__ | p:NAME | s:NAME
+let SEL = new Set();       // emails ticked for a bulk action
+let CUR = null;            // selected account
+
+// Generation counter for the poll loop. Every new poll (or stop, or switching
+// account) bumps it; a loop whose generation is stale exits without touching
+// the DOM. Without this, starting a LINK poll while a CODE poll is still
+// running leaves two loops writing to the same panel.
+let pollGen = 0;
+
+// ══════════════════════════════════════════════════════════════════════
+//  helpers
+// ══════════════════════════════════════════════════════════════════════
+const $  = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, m =>
+  ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
+
+// A JS string literal safe to embed inside a double-quoted HTML attribute.
+// esc() alone is NOT enough: it turns ' into &#39;, which the HTML parser hands
+// back to JS as a bare quote and breaks the handler (a service name or note
+// containing an apostrophe would do it).
+const jsq = s => esc(JSON.stringify(String(s ?? "")));
+
+function toast(msg, bad) {
+  const d = document.createElement("div");
+  d.className = "t" + (bad ? " bad" : "");
+  d.textContent = msg;
+  $("#toast").append(d);
+  setTimeout(() => d.remove(), 3200);
+}
+
+function copy(t) {
+  navigator.clipboard.writeText(t).then(
+    () => toast("copied"),
+    () => toast("copy blocked by browser", true));
+}
+
+async function api(path, params, opts = {}) {
+  const u = new URL(cfg.base.replace(/\/$/, "") + path);
+  for (const [k, v] of Object.entries(params || {}))
+    if (v !== undefined && v !== null && v !== "") u.searchParams.set(k, v);
+  const r = await fetch(u, {
+    method: opts.method || "GET",
+    headers: Object.assign(
+      { authorization: "Bearer " + cfg.token },
+      opts.body ? { "content-type": "application/json" } : {}),
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const txt = await r.text();
+  if (!r.ok) throw new Error("HTTP " + r.status + " — " + txt.slice(0, 200));
+  return txt ? JSON.parse(txt) : {};
+}
+
+const fmt = ms => new Date(ms).toLocaleString(undefined,
+  { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" });
+
+function randHex(n) {
+  const b = new Uint8Array(n);
+  crypto.getRandomValues(b);
+  return [...b].map(x => x.toString(16).padStart(2, "0")).join("");
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  data
+// ══════════════════════════════════════════════════════════════════════
+async function load() {
+  $("#mDomain").textContent = cfg.domain;
+  $("#mPass").textContent = PASSWORD;
+  try {
+    await api("/health");
+    $("#mDot").className = "dot ok";
+    $("#mHealth").textContent = "API up";
+  } catch (e) {
+    $("#mDot").className = "dot bad";
+    $("#mHealth").textContent = "API unreachable";
+    toast("API unreachable — check ⚙ settings", true);
+  }
+  try {
+    CREDS = (await api("/creds")).creds || [];
+  } catch (e) {
+    CREDS = [];
+    toast(e.message, true);
+  }
+  $("#mCount").textContent = CREDS.length;
+  renderServices();
+  CUR ? showAccount(CUR.email) : renderList();
+}
+
+// Two levels of grouping: PROGRAM (bug-bounty programme, e.g. TIKTOK) contains
+// SERVICES (individual hosts you registered on).
+const groups = (key = "target") => {
+  const g = {};
+  for (const r of CREDS) ((g[(r[key] || "").trim() || "(none)"] ||= []).push(r));
+  return g;
+};
+
+/** Rows for the current view. SVC is "__all__" | "__recent__" | "p:NAME" | "s:NAME". */
+function viewRows() {
+  if (SVC.startsWith("p:")) {
+    const n = SVC.slice(2);
+    return CREDS.filter(r => ((r.program || "").trim() || "(none)") === n);
+  }
+  if (SVC.startsWith("s:")) {
+    const n = SVC.slice(2);
+    return CREDS.filter(r => ((r.target || "").trim() || "(none)") === n);
+  }
+  return CREDS.slice();
+}
+
+function viewTitle() {
+  if (SVC.startsWith("p:")) return "Program: " + SVC.slice(2);
+  if (SVC.startsWith("s:")) return SVC.slice(2);
+  return "All accounts";
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  sidebar
+// ══════════════════════════════════════════════════════════════════════
+function renderServices() {
+  const q = ($("#svcSearch").value || "").toLowerCase();
+  const byProg = groups("program"), bySvc = groups("target");
+  const sortNames = g => Object.keys(g).filter(n => n.toLowerCase().includes(q))
+    .sort((a, b) => g[b].length - g[a].length || a.localeCompare(b));
+
+  const row = (id, label, count, cls = "") =>
+    `<div class="svc ${SVC === id ? "on" : ""} ${cls}" onclick="pickSvc(${jsq(id)})">
+       <span class="n">${label}</span><span class="c">${count}</span></div>`;
+
+  let h = row("__recent__", "⚡ Recent mail", "live")
+        + row("__all__", "All accounts", CREDS.length);
+
+  const progs = sortNames(byProg).filter(n => n !== "(none)");
+  if (progs.length) {
+    h += `<h2 style="margin:16px 0 6px">Programs</h2>`;
+    for (const n of progs) h += row("p:" + n, esc(n), byProg[n].length, "prog");
+  }
+  if (byProg["(none)"] && (!q || "unassigned".includes(q)))
+    h += row("p:(none)", `<span style="color:var(--faint)">unassigned</span>`,
+             byProg["(none)"].length);
+
+  h += `<h2 style="margin:16px 0 6px">Services</h2>`;
+  for (const n of sortNames(bySvc)) h += row("s:" + n, esc(n), bySvc[n].length);
+
+  $("#svcList").innerHTML = h;
+}
+
+function pickSvc(n) {
+  pollGen++; SVC = n; CUR = null; renderServices();
+  n === "__recent__" ? renderFeed() : (stopAuto(), renderList());
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Recent-mail feed — every address at once, codes already extracted
+// ══════════════════════════════════════════════════════════════════════
+let feedTimer = null, feedSeen = 0;
+
+function stopAuto() { clearInterval(feedTimer); feedTimer = null; }
+
+function toggleAuto() {
+  if (feedTimer) { stopAuto(); toast("auto-refresh off"); }
+  else { feedTimer = setInterval(() => refreshFeed(true), 10000); toast("auto-refresh on (10s)"); }
+  const b = $("#autoBtn");
+  if (b) { b.textContent = feedTimer ? "Auto ⏸" : "Auto ▶"; b.className = feedTimer ? "primary" : ""; }
+}
+
+function renderFeed() {
+  $("#view").innerHTML = `
+    <div class="row" style="margin-bottom:14px">
+      <h3 style="margin:0">⚡ Recent mail
+        <span style="color:var(--faint);font-weight:400">· all addresses</span></h3>
+      <div class="spacer"></div>
+      <button class="primary" onclick="refreshFeed()">Poll now</button>
+      <button id="autoBtn" onclick="toggleAuto()">Auto ▶</button>
+    </div>
+    <div id="feed"><div class="card"><span class="spin"></span>loading…</div></div>`;
+  refreshFeed();
+}
+
+async function refreshFeed(quiet) {
+  const el = $("#feed");
+  if (!el) return stopAuto();          // user navigated away
+  let msgs;
+  try { msgs = (await api("/recent", { limit: 60 })).messages || []; }
+  catch (e) { if (!quiet) toast(e.message, true); return; }
+  if (!$("#feed")) return stopAuto();
+
+  if (msgs.length > feedSeen && feedSeen && quiet)
+    toast(`${msgs.length - feedSeen} new message(s)`);
+  feedSeen = msgs.length;
+
+  if (!msgs.length) {
+    el.innerHTML = `<div class="empty">No mail received yet on ${esc(cfg.domain)}.</div>`;
+    return;
+  }
+  // map address -> service, so a row says which account it belongs to
+  const svcOf = Object.fromEntries(CREDS.map(r => [r.email, r.target || ""]));
+
+  el.innerHTML = msgs.map(m => mailRow(m, svcOf[m.to], true)).join("");
+}
+
+/** One message row. Shared by the global feed and the per-account list. */
+function mailRow(m, svc, showTo) {
+  return `<div class="feedrow">
+    <div class="fr-main" onclick="openMsg(${jsq(m.id)})">
+      <div class="s">${esc(m.subject || "(no subject)")}</div>
+      <div class="f">${showTo ? esc(m.to) + (svc ? ` · <b>${esc(svc)}</b>` : "") + " — " : ""}${esc(m.from)}</div>
+      <div class="note" style="margin-top:3px">${esc(m.preview || m.text || "")}</div>
+    </div>
+    <div class="fr-side">
+      <div class="when">${when(m.received_at)}</div>
+      ${m.code
+        ? `<button class="codebtn" onclick="event.stopPropagation();copy(${jsq(m.code)})"
+             title="click to copy">${esc(m.code)}</button>` : ""}
+      ${m.links && m.links.length
+        ? `<button class="sm ghost" onclick="event.stopPropagation();showFeedLinks(${jsq(m.id)})">
+             ${m.links.length} link${m.links.length > 1 ? "s" : ""}</button>` : ""}
+    </div>
+  </div>`;
+}
+
+/** Auto-loaded whenever an account is opened, so the panel is never empty. */
+async function loadAccountMail(email, quiet) {
+  const el = $("#mail");
+  if (!el) return;
+  if (!quiet) el.innerHTML = `<div class="card"><span class="spin"></span>loading mail…</div>`;
+  let msgs;
+  try { msgs = (await api("/inbox/" + encodeURIComponent(email), { limit: 25 })).messages || []; }
+  catch (e) {
+    if ($("#mail")) $("#mail").innerHTML = `<div class="card"><b class="bad">${esc(e.message)}</b></div>`;
+    return;
+  }
+  // The user may have navigated elsewhere during the request.
+  if (!$("#mail") || !CUR || CUR.email !== email) return;
+
+  $("#mail").innerHTML = `<div class="row" style="margin:4px 0 10px">
+      <h3 style="margin:0">Recent mail
+        <span style="color:var(--faint);font-weight:400">· ${msgs.length}</span></h3>
+      <div class="spacer"></div>
+      <button class="sm" onclick="loadAccountMail(${jsq(email)})">↻ refresh</button>
+    </div>` +
+    (msgs.length
+      ? msgs.map(m => mailRow(m, null, false)).join("")
+      : `<div class="empty">Nothing received yet at ${esc(email)}.<br><br>
+           Sign up on the target with this address, then press <b>Get CODE</b> above —
+           it waits for the mail to arrive.</div>`);
+}
+
+function when(ms) {
+  const s = Math.round((Date.now() - ms) / 1000);
+  if (s < 60) return s + "s ago";
+  if (s < 3600) return Math.round(s / 60) + "m ago";
+  if (s < 86400) return Math.round(s / 3600) + "h ago";
+  return new Date(ms).toLocaleDateString();
+}
+
+async function showFeedLinks(id) {
+  let m;
+  try { m = await api("/message/" + encodeURIComponent(id)); }
+  catch (e) { return toast(e.message, true); }
+  const urls = [...new Set([...(m.html || ""), ].length
+    ? (m.html || "").match(/https?:\/\/[^\s<>"')\]]+/g) || [] : [])]
+    .concat(((m.text || "").match(/https?:\/\/[^\s<>"')\]]+/g) || []));
+  const uniq = [...new Set(urls.map(u => u.replace(/&amp;/g, "&").replace(/[.,);]+$/, "")))];
+  modal(`<h3>Links — ${esc(m.subject || "")}</h3>
+    ${uniq.length ? uniq.map(u => `<div class="row" style="margin-bottom:6px">
+        <a href="${esc(u)}" target="_blank" rel="noopener" class="mono"
+           style="color:var(--accent2);word-break:break-all;flex:1;font-size:12px">${esc(u)}</a>
+        <button class="sm" onclick="copy(${jsq(u)})">copy</button></div>`).join("")
+      : `<div class="empty">no links</div>`}
+    <div class="note" style="margin-top:10px">⚠ Verification links are usually
+      <b>single-use</b> — open in the browser you signed up with.</div>
+    <div class="row" style="margin-top:12px"><button class="ghost" onclick="closeModal()">Close</button></div>`);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  account list + detail
+// ══════════════════════════════════════════════════════════════════════
+function renderList() {
+  const rows = viewRows().sort((a, b) => b.created_at - a.created_at);
+  if (!rows.length) {
+    $("#view").innerHTML = `<div class="empty">No accounts here.<br><br>
+      Use <b>+ New account</b> to mint one, or <b>Register existing</b> after a manual signup.</div>`;
+    return;
+  }
+  const allOn = rows.every(r => SEL.has(r.email));
+  let h = `<div class="row" style="margin-bottom:12px">
+      <h3 style="margin:0">${esc(viewTitle())}
+        <span style="color:var(--faint);font-weight:400">· ${rows.length}</span></h3>
+      <div class="spacer"></div>
+      <button class="sm" onclick="copyCreds()">⧉ Copy creds</button>
+      <button class="sm ghost" onclick="selectAll(${!allOn})">${allOn ? "clear" : "select"} all</button>
+    </div>
+    <div id="bulk"></div>
+    <div class="grid">`;
+
+  for (const r of rows) {
+    const on = SEL.has(r.email);
+    h += `<div class="acct ${on ? "sel" : ""}">
+      <div class="row" style="gap:10px;align-items:flex-start;flex-wrap:nowrap">
+        <input type="checkbox" class="cb" ${on ? "checked" : ""}
+               onclick="event.stopPropagation();toggleSel(${jsq(r.email)})">
+        <div style="flex:1;min-width:0" onclick="showAccount(${jsq(r.email)})">
+          <div class="em">${esc(r.email)}</div>
+          <div class="pw">${esc(r.password || "(no password recorded)")}</div>
+          <div style="margin-top:6px">
+            ${r.program ? `<span class="tag prog">${esc(r.program)}</span> ` : ""}
+            <span class="tag">${esc(r.target || "no service")}</span>
+          </div>
+          ${r.note ? `<div class="note" style="margin-top:6px">${esc(r.note)}</div>` : ""}
+          <div class="note" style="color:var(--faint);margin-top:4px">${fmt(r.created_at)}</div>
+        </div>
+      </div></div>`;
+  }
+  $("#view").innerHTML = h + `</div>`;
+  renderBulk();
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Bulk selection — assign accounts to a bug-bounty program
+// ══════════════════════════════════════════════════════════════════════
+function toggleSel(email) { SEL.has(email) ? SEL.delete(email) : SEL.add(email); renderList(); }
+function selectAll(on) {
+  viewRows().forEach(r => on ? SEL.add(r.email) : SEL.delete(r.email));
+  renderList();
+}
+function clearSel() { SEL.clear(); renderList(); }
+
+// ── credentials export ────────────────────────────────────────────────
+const mdCell = s => String(s ?? "").replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim() || "—";
+
+/** Markdown table of credentials + the API footer an agent needs to use them. */
+function credsMarkdown(rows, title) {
+  const head = `## Accounts — ${title} (${rows.length})\n\n`
+    + `| # | Email | Password | Program | Service | Note |\n`
+    + `|---|-------|----------|---------|---------|------|\n`;
+  const body = rows.map((r, i) =>
+    `| ${i + 1} | ${mdCell(r.email)} | ${mdCell(r.password)} | ${mdCell(r.program)} `
+    + `| ${mdCell(r.target)} | ${mdCell(r.note)} |`).join("\n");
+
+  return head + body + `
+
+All addresses are on the catch-all domain **${cfg.domain}** — they receive mail
+permanently. To read a verification code, login code or password-reset link for
+any of them:
+
+    BASE  = ${cfg.base}
+    TOKEN = ${cfg.token}
+    AUTH  = "Authorization: Bearer $TOKEN"
+
+    curl -s -H "$AUTH" "$BASE/code/<email>?wait=25&since=$(date +%s000)"
+      {"found":true,"code":"483920"}          -> use it
+      {"found":false}                         -> NOT an error; each call blocks
+                                                 max 25s, loop to your own
+                                                 deadline (240s is sane)
+      {"found":true,"code":null,"body":"..."} -> mail arrived but nothing
+                                                 matched; read "body", retry
+                                                 with &pattern=<regex>, group 1
+
+    curl -s -H "$AUTH" "$BASE/links/<email>?wait=25&filter=verify"   # magic links
+    curl -s -H "$AUTH" "$BASE/inbox/<email>?limit=10"                # what arrived
+
+Notes: 'since' is epoch MILLISECONDS taken just before you trigger the mail.
+Verification links are usually single-use — open in a browser, never fetch first.
+Email only; there is no SMS capability.`;
+}
+
+function copyCreds() {
+  const inView = viewRows().sort((a, b) => b.created_at - a.created_at);
+  const rows = SEL.size ? inView.filter(r => SEL.has(r.email)) : inView;
+  if (!rows.length) return toast("nothing to copy", true);
+  copy(credsMarkdown(rows, SEL.size ? `${viewTitle()} (selected)` : viewTitle()));
+  toast(`copied ${rows.length} credential(s) as markdown`);
+}
+
+function renderBulk() {
+  const el = $("#bulk");
+  if (!el) return;
+  if (!SEL.size) { el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="bulkbar">
+    <b>${SEL.size}</b> selected
+    <div class="spacer"></div>
+    <button onclick="copyCreds()">⧉ Copy creds</button>
+    <button class="primary" onclick="openAssign()">Move to program…</button>
+    <button onclick="openAssign(true)">Set service…</button>
+    <button class="danger ghost" onclick="bulkDelete()">Delete</button>
+    <button class="ghost" onclick="clearSel()">Clear</button>
+  </div>`;
+}
+
+function openAssign(isService) {
+  const existing = [...new Set(CREDS.map(r => (isService ? r.target : r.program) || "")
+    .filter(Boolean))].sort();
+  const what = isService ? "service" : "program";
+  modal(`<h3>Move ${SEL.size} account(s) to a ${what}</h3>
+    <div class="note">${isService
+      ? "The service is the individual host you registered on (e.g. seller-us.tiktok.com)."
+      : "A program groups every account you hold under one bug-bounty programme, across all of its hosts — so you can see at a glance what you already have for it."}</div>
+    ${existing.length ? `<label>Existing</label><div class="row">
+      ${existing.map(n => `<button class="sm" onclick="$('#aName').value=${jsq(n)}">${esc(n)}</button>`).join("")}
+    </div>` : ""}
+    <label>${what[0].toUpperCase() + what.slice(1)} name</label>
+    <input id="aName" placeholder="${isService ? "seller-us.tiktok.com" : "TIKTOK"}" autofocus
+           onkeydown="if(event.key==='Enter')doAssign(${!!isService})">
+    <div class="row" style="margin-top:16px">
+      <button class="primary" onclick="doAssign(${!!isService})">Move</button>
+      <button class="ghost" onclick="closeModal()">Cancel</button>
+      ${isService ? "" : `<div class="spacer"></div>
+        <button class="ghost" onclick="$('#aName').value='';doAssign(false)">Unassign</button>`}
+    </div>`);
+  setTimeout(() => $("#aName") && $("#aName").focus(), 50);
+}
+
+async function doAssign(isService) {
+  const v = $("#aName").value.trim();
+  if (isService && !v) return toast("service name required", true);
+  const body = { addrs: [...SEL] };
+  isService ? (body.target = v) : (body.program = v);
+  try {
+    const r = await api("/assign", null, { method: "POST", body });
+    toast(`moved ${r.updated} account(s)`);
+  } catch (e) { return toast(e.message, true); }
+  closeModal();
+  SEL.clear();
+  await load();
+}
+
+async function bulkDelete() {
+  const n = SEL.size;
+  if (!confirm(`Delete ${n} credential(s) from the ledger?\n\n`
+    + `The addresses keep receiving mail (catch-all), and any accounts you registered `
+    + `on those targets STILL EXIST — this only forgets them here.`)) return;
+  let ok = 0;
+  for (const email of [...SEL]) {
+    try { await api("/identity/" + encodeURIComponent(email), null, { method: "DELETE" }); ok++; }
+    catch (e) { toast(`${email}: ${e.message}`, true); }
+  }
+  toast(`deleted ${ok}/${n}`);
+  SEL.clear();
+  await load();
+}
+
+function showAccount(email) {
+  const r = CREDS.find(x => x.email === email);
+  if (!r) return renderList();
+  pollGen++;              // a poll for the previous account must not render here
+  CUR = r;
+  $("#view").innerHTML = `
+    <div class="row" style="margin-bottom:14px">
+      <button class="ghost" onclick="pollGen++;CUR=null;renderList()">← back</button>
+      <div class="spacer"></div>
+      <button class="primary" onclick="runPoll('code')">Get CODE</button>
+      <button onclick="askLink()">Get LINK</button>
+      <button onclick="loadAccountMail(CUR.email)">↻ Mail</button>
+      <button onclick="showAgent()">NEO block</button>
+      <button class="danger ghost" onclick="purge()">Purge inbox</button>
+      <button class="danger ghost" onclick="delAccount()">Delete</button>
+    </div>
+    <div class="card">
+      <div class="kv">
+        <div class="k">EMAIL</div><div class="v">${esc(r.email)}
+          <button class="sm ghost" onclick="copy(${jsq(r.email)})">copy</button></div>
+        <div class="k">PASSWORD</div><div class="v">${esc(r.password || "—")}
+          <button class="sm ghost" onclick="copy(${jsq(r.password || "")})">copy</button></div>
+        <div class="k">SERVICE</div><div class="v">${esc(r.target || "—")}</div>
+        ${r.note ? `<div class="k">NOTE</div><div class="v" style="font-family:inherit">${esc(r.note)}</div>` : ""}
+        <div class="k">CREATED</div><div class="v">${fmt(r.created_at)}</div>
+      </div>
+    </div>
+    <div id="out"></div>
+    <div id="mail"></div>`;
+  loadAccountMail(r.email);   // never leave the panel empty
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  polling — the core of the whole thing
+// ══════════════════════════════════════════════════════════════════════
+function stopPoll() {
+  pollGen++;                       // invalidates any loop currently in flight
+  $("#out").innerHTML = `<div class="card">Stopped.
+    <div class="note" style="margin-top:6px">Mail already sent still arrives — press
+    <b>Get CODE</b> again whenever you like, nothing is lost.</div></div>`;
+}
+
+/** Inline filter picker for links. Replaces the old native prompt(), which
+ *  also let a second poll start while the first was still running. */
+function askLink() {
+  if (!CUR) return;
+  pollGen++;                       // cancel whatever is running first
+  const chip = x => `<button class="sm" onclick="runPoll('links',${jsq(x)})">${x}</button>`;
+  $("#out").innerHTML = `<div class="card">
+    <h3>Get link</h3>
+    <div class="note">Return only URLs containing this text. Leave blank for every link
+      in the message.</div>
+    <div class="row" style="margin:12px 0">
+      <input id="lf" placeholder="verify" style="flex:1;min-width:180px"
+             onkeydown="if(event.key==='Enter')runPoll('links',this.value.trim())">
+      <button class="primary" onclick="runPoll('links',$('#lf').value.trim())">Start</button>
+    </div>
+    <div class="row">${["verify","confirm","activate","reset"].map(chip).join("")}
+      <button class="sm ghost" onclick="runPoll('links','')">all links</button>
+    </div></div>`;
+  $("#lf").focus();
+}
+
+async function runPoll(kind, filter = "") {
+  if (!CUR) return;
+  const gen = ++pollGen;           // claim this generation
+  const out = $("#out");
+  const email = CUR.email;         // pin it: the user may switch accounts mid-poll
+  const since = Date.now() - 120000;   // 2 min back, covers clock skew
+  const deadline = Date.now() + POLL_TOTAL * 1000;
+  let n = 0;
+
+  for (;;) {
+    if (gen !== pollGen) return;   // superseded or stopped
+    n++;
+    const left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+    out.innerHTML = `<div class="card"><span class="spin"></span>
+      Waiting for ${kind === "code" ? "a code" : "a link"} at
+      <b class="mono">${esc(email)}</b> …
+      <span style="color:var(--faint)">attempt ${n}, ${left}s left</span>
+      <button class="sm ghost" style="margin-left:12px" onclick="stopPoll()">stop</button>
+      ${filter ? `<div class="note" style="margin-top:6px">filter: <b>${esc(filter)}</b></div>` : ""}
+      <div class="note" style="margin-top:8px">Some targets batch outbound mail for minutes.
+      This is normal — do <b>not</b> resubmit the signup form.</div></div>`;
+
+    let res;
+    try {
+      res = await api(`/${kind}/` + encodeURIComponent(email),
+                      { wait: POLL_WAIT, since, filter: filter || undefined });
+    } catch (e) {
+      if (gen !== pollGen) return;
+      out.innerHTML = `<div class="card"><b class="bad">Error:</b> ${esc(e.message)}</div>`;
+      return;
+    }
+    if (gen !== pollGen) return;   // re-check: the await may have taken 25s
+    if (res.found) return showResult(kind, res);
+    if (Date.now() >= deadline) break;
+  }
+
+  out.innerHTML = `<div class="card"><b class="bad">No mail arrived.</b>
+    <div class="note" style="margin-top:8px">
+      Do <b>NOT</b> resubmit the signup form — that creates a duplicate account and looks
+      like an attack. Check <b>Inbox</b> first; the mail may have arrived with wording the
+      filter missed. If it is genuinely empty, use the target's own “resend” control.
+    </div></div>`;
+}
+
+function showResult(kind, res) {
+  const out = $("#out");
+  if (CUR) loadAccountMail(CUR.email, true);   // the new mail should appear below too
+  const head = `<div class="kv" style="margin-bottom:10px">
+      <div class="k">FROM</div><div class="v">${esc(res.from)}</div>
+      <div class="k">SUBJECT</div><div class="v" style="font-family:inherit">${esc(res.subject)}</div>
+    </div>`;
+
+  if (kind === "code") {
+    if (res.code) {
+      out.innerHTML = `<div class="card">${head}
+        <div class="code-hit">${esc(res.code)}</div>
+        <button class="primary" onclick="copy(${jsq(res.code)})">Copy code</button></div>`;
+    } else {
+      out.innerHTML = `<div class="card">${head}
+        <b class="warn">Mail arrived, but no code matched.</b>
+        <div class="note">Numeric, split (704 812) and alphanumeric (GNN93Y) are handled
+        automatically — this one is unusual. Read the body and extract with a regex whose
+        <b>group 1</b> is the code.</div>
+        <pre style="margin:10px 0">${esc(res.body || "")}</pre>
+        <div class="row"><input id="pat" placeholder="code is ([A-Z0-9-]{5,10})">
+        <button onclick="retryPattern()">Extract</button></div></div>`;
+    }
+    return;
+  }
+
+  const links = res.links || [];
+  out.innerHTML = `<div class="card">${head}
+    ${links.length
+      ? links.map(u => `<div class="row" style="margin-bottom:6px">
+            <a href="${esc(u)}" target="_blank" rel="noopener"
+               class="mono" style="color:var(--accent2);word-break:break-all;flex:1">${esc(u)}</a>
+            <button class="sm" onclick="copy(${jsq(u)})">copy</button></div>`).join("")
+      : `<b class="warn">Mail arrived but contained no matching link.</b>
+         <pre style="margin-top:10px">${esc(res.body || "")}</pre>`}
+    <div class="note" style="margin-top:10px">⚠ Verification links are usually
+    <b>single-use</b>. Open it in the browser you signed up with. Do not fetch it
+    anywhere else first — that burns it.</div></div>`;
+}
+
+async function retryPattern() {
+  const pattern = $("#pat").value.trim();
+  if (!pattern || !CUR) return;
+  try {
+    const res = await api("/code/" + encodeURIComponent(CUR.email),
+                          { since: 0, wait: 5, pattern });
+    if (res.code) showResult("code", res);
+    else toast("still no match", true);
+  } catch (e) { toast(e.message, true); }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  inbox
+// ══════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════
+//  Message viewer — renders HTML mail the way a mail client would
+// ══════════════════════════════════════════════════════════════════════
+let MSG = null, MSGVIEW = "rendered", MSGIMG = false;
+
+const stripTags = h => (h || "")
+  .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
+  .replace(/<(br|\/p|\/div|\/tr)[^>]*>/gi, "\n")
+  .replace(/<[^>]+>/g, " ")
+  .replace(/&nbsp;/gi, " ")
+  .replace(/[ \t]+/g, " ")
+  .replace(/\n{3,}/g, "\n\n");
+
+/**
+ * Wrap the email's own HTML in a minimal document for the sandboxed iframe.
+ *
+ * Mail is fully attacker-controlled — anyone can send to a catch-all — so this
+ * is defence in depth:
+ *   • the iframe has NO allow-scripts and NO allow-same-origin, so nothing can
+ *     execute or reach this page's localStorage (where the API token lives);
+ *   • the CSP blocks everything except inline styles;
+ *   • remote images are blocked unless you ask, because a tracking pixel tells
+ *     the sender you opened it — and on a bounty target that is a tell.
+ */
+function mailDoc(html, loadImages) {
+  const csp = "default-src 'none'; style-src 'unsafe-inline'; "
+            + `img-src ${loadImages ? "https: http: data:" : "data:"}; font-src data:;`;
+  return `<!doctype html><html><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="${csp}">
+<base target="_blank">
+<style>
+  html,body{margin:0;padding:14px;background:#fff;color:#111;
+    font:14px/1.55 -apple-system,"Segoe UI",Roboto,sans-serif;word-wrap:break-word}
+  img{max-width:100%;height:auto} table{max-width:100%!important}
+  a{color:#0969da}
+</style></head><body>${html}</body></html>`;
+}
+
+async function openMsg(id) {
+  let m;
+  try { m = await api("/message/" + encodeURIComponent(id), { raw: 1 }); }
+  catch (e) { return toast(e.message, true); }
+  MSG = m;
+  MSGVIEW = m.html ? "rendered" : "text";
+  MSGIMG = false;
+  drawMsg();
+}
+
+function drawMsg() {
+  const m = MSG;
+  if (!m) return;
+  const text = (m.text || stripTags(m.html)).trim();
+  const tab = (k, label, ok) =>
+    `<button class="sm ${MSGVIEW === k ? "primary" : ""}" ${ok ? "" : "disabled"}
+       onclick="MSGVIEW=${jsq(k)};drawMsg()">${label}</button>`;
+
+  let body;
+  if (MSGVIEW === "rendered" && m.html) {
+    body = `<iframe class="mailframe" sandbox="allow-popups allow-popups-to-escape-sandbox"
+              srcdoc="${esc(mailDoc(m.html, MSGIMG))}"></iframe>`;
+  } else if (MSGVIEW === "raw") {
+    body = `<pre>${esc(m.raw || "(raw MIME not stored for this message)")}</pre>`;
+  } else {
+    body = `<pre>${esc(text)}</pre>`;
+  }
+
+  modal(`<h3 style="margin-bottom:4px">${esc(m.subject || "(no subject)")}</h3>
+    <div class="kv" style="margin-bottom:12px">
+      <div class="k">FROM</div><div class="v">${esc(m.from)}</div>
+      <div class="k">TO</div><div class="v">${esc(m.to)}</div>
+      <div class="k">WHEN</div><div class="v">${fmt(m.received_at)}</div>
+      ${m.code ? `<div class="k">CODE</div><div class="v">
+        <button class="codebtn" onclick="copy(${jsq(m.code)})">${esc(m.code)}</button></div>` : ""}
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      ${tab("rendered", "Rendered", !!m.html)}
+      ${tab("text", "Plain text", true)}
+      ${tab("raw", "Raw MIME", !!m.raw)}
+      <div class="spacer"></div>
+      ${MSGVIEW === "rendered" && m.html
+        ? `<button class="sm ${MSGIMG ? "primary" : "ghost"}"
+             onclick="MSGIMG=!MSGIMG;drawMsg()">${MSGIMG ? "Images on" : "Load images"}</button>`
+        : ""}
+    </div>
+    ${body}
+    ${MSGVIEW === "rendered" && m.html && !MSGIMG
+      ? `<div class="note" style="margin-top:8px">Remote images blocked — a tracking pixel
+           would tell the sender you opened this.</div>` : ""}
+    <div class="row" style="margin-top:12px">
+      <button onclick="copy(${jsq(text)})">Copy text</button>
+      <button class="ghost" onclick="closeModal()">Close</button>
+    </div>`);
+}
+
+function delAccount() {
+  if (!CUR) return;
+  const r = CUR;
+  modal(`<h3 class="bad">Delete this credential?</h3>
+    <div class="kv" style="margin:12px 0">
+      <div class="k">EMAIL</div><div class="v">${esc(r.email)}</div>
+      <div class="k">SERVICE</div><div class="v">${esc(r.target || "—")}</div>
+    </div>
+    <div class="note">This removes it from your ledger only. The address itself keeps
+      receiving mail forever — it is a catch-all, there is nothing to de-provision, and
+      <b>any account you registered on a target with it still exists</b>. Delete the account
+      on the target's own site if you want it gone there.</div>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:14px;cursor:pointer">
+      <input type="checkbox" id="dPurge" style="width:auto"> also delete its stored mail
+    </label>
+    <div class="row" style="margin-top:16px">
+      <button class="danger" onclick="doDelete(${jsq(r.email)})"
+        style="border-color:var(--bad);color:var(--bad)">Delete</button>
+      <button class="ghost" onclick="closeModal()">Cancel</button></div>`);
+}
+
+async function doDelete(email) {
+  const purgeToo = $("#dPurge") && $("#dPurge").checked;
+  try {
+    const res = await api("/identity/" + encodeURIComponent(email),
+                          purgeToo ? { purge: 1 } : null, { method: "DELETE" });
+    toast(`deleted${res.messages_deleted ? ` + ${res.messages_deleted} message(s)` : ""}`);
+  } catch (e) { return toast(e.message, true); }
+  closeModal();
+  pollGen++; CUR = null;
+  await load();
+  renderList();
+}
+
+async function purge() {
+  if (!CUR) return;
+  if (!confirm(`Delete ALL stored messages for ${CUR.email}?\n\nThe address keeps working; only history is removed.`)) return;
+  try {
+    const r = await api("/inbox/" + encodeURIComponent(CUR.email), null, { method: "DELETE" });
+    toast(`deleted ${r.deleted} message(s)`);
+    loadAccountMail(CUR.email);
+  } catch (e) { toast(e.message, true); }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  create / register
+// ══════════════════════════════════════════════════════════════════════
+function openNew() {
+  modal(`<h3>New account</h3>
+    <div class="note">Mints a random address on the catch-all domain. It works immediately —
+    nothing is provisioned. The password is the fixed one, so you can never lose the account.</div>
+    <label>Service / target</label><input id="nTarget" placeholder="tiktok" autofocus>
+    <label>Note</label><input id="nNote" placeholder="role, plan, anything">
+    <label>Password</label><input id="nPass" value="${esc(PASSWORD)}">
+    <div class="row" style="margin-top:16px">
+      <button class="primary" onclick="doNew()">Create</button>
+      <button class="ghost" onclick="closeModal()">Cancel</button></div>`);
+}
+
+async function doNew() {
+  const target = $("#nTarget").value.trim();
+  const note = $("#nNote").value.trim();
+  const password = $("#nPass").value || PASSWORD;
+  const email = `bb-${randHex(4)}@${cfg.domain}`;
+  try {
+    await api("/identity", null, { method: "POST",
+      body: { addr: email, note: JSON.stringify({ target, password, note }) } });
+  } catch (e) { return toast(e.message, true); }
+  modal(`<h3 class="ok">Account created</h3>
+    <div class="kv" style="margin:14px 0">
+      <div class="k">EMAIL</div><div class="v">${esc(email)}
+        <button class="sm ghost" onclick="copy(${jsq(email)})">copy</button></div>
+      <div class="k">PASSWORD</div><div class="v">${esc(password)}
+        <button class="sm ghost" onclick="copy(${jsq(password)})">copy</button></div>
+      ${target ? `<div class="k">SERVICE</div><div class="v">${esc(target)}</div>` : ""}
+    </div>
+    <div class="note">Sign up on the target with exactly these, then come back and press
+    <b>Get CODE</b> or <b>Get LINK</b>.</div>
+    <div class="row" style="margin-top:16px">
+      <button class="primary" onclick="closeModal();load().then(()=>showAccount(${jsq(email)}))">Open account</button>
+      <button class="ghost" onclick="closeModal();load()">Done</button></div>`);
+}
+
+function openRegister() {
+  modal(`<h3>Register an existing account</h3>
+    <div class="note">Use after signing up manually in a browser, so the account lands in the
+    ledger and can be handed to NEO.</div>
+    <label>Email (localpart is enough)</label><input id="rEmail" placeholder="acme-01" autofocus>
+    <label>Password</label><input id="rPass" value="${esc(PASSWORD)}">
+    <label>Service / target</label><input id="rTarget" placeholder="tiktok">
+    <label>Note</label><input id="rNote" placeholder="role, plan, anything">
+    <div class="row" style="margin-top:16px">
+      <button class="primary" onclick="doRegister()">Save</button>
+      <button class="ghost" onclick="closeModal()">Cancel</button></div>`);
+}
+
+async function doRegister() {
+  let email = $("#rEmail").value.trim();
+  if (!email) return toast("email required", true);
+  if (!email.includes("@")) email += "@" + cfg.domain;
+  if (!email.endsWith("@" + cfg.domain) &&
+      !confirm(`${email} is not on ${cfg.domain}.\nThis dashboard cannot read its mail. Record anyway?`)) return;
+  try {
+    await api("/identity", null, { method: "POST", body: { addr: email,
+      note: JSON.stringify({ target: $("#rTarget").value.trim(),
+                             password: $("#rPass").value || PASSWORD,
+                             note: $("#rNote").value.trim() }) } });
+  } catch (e) { return toast(e.message, true); }
+  toast("recorded " + email);
+  closeModal();
+  await load();
+  showAccount(email);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  NEO handoff + settings
+// ══════════════════════════════════════════════════════════════════════
+/** Paste-ready instructions for an agent. With `rec`, scoped to one account. */
+function agentText(rec) {
+  const addr = rec ? rec.email : "<email>";
+  const head = rec
+    ? `Account for ${rec.target || "this service"}${rec.program ? ` (program: ${rec.program})` : ""}:
+  EMAIL    = ${rec.email}
+  PASSWORD = ${rec.password || "(unknown)"}
+`
+    : `Catch-all mailbox ${cfg.domain}. EVERY address *@${cfg.domain} already receives
+mail permanently — invent one and use it, nothing needs creating first.
+`;
+  return `${head}
+Mailbox API:
+  BASE  = ${cfg.base}
+  TOKEN = ${cfg.token}
+  AUTH  = "Authorization: Bearer $TOKEN"     (all calls except /health)
+${rec ? "" : `
+Mint an identity (email + password, recorded in the ledger):
+  curl -s -X POST -H "$AUTH" "$BASE/new?target=<host>"
+`}
+Get a verification code (numeric, split "704 812" and alphanumeric "GNN93Y" all handled):
+  curl -s -H "$AUTH" "$BASE/code/${addr}?wait=25&since=$(date +%s000)"
+    {"found":true,"code":"483920"}          -> use it
+    {"found":false}                         -> NOT an error; each call blocks max 25s,
+                                               LOOP to your own deadline (240s is sane)
+    {"found":true,"code":null,"body":"..."} -> mail arrived but nothing matched;
+                                               read "body", retry with &pattern=<regex>
+                                               whose group 1 is the code
+
+Magic / confirmation links:
+  curl -s -H "$AUTH" "$BASE/links/${addr}?wait=25&filter=verify"
+
+Inspect what actually arrived:
+  curl -s -H "$AUTH" "$BASE/inbox/${addr}?limit=10"
+${rec ? "" : `  curl -s -H "$AUTH" "$BASE/recent?limit=50"     # all addresses, codes extracted
+  curl -s -H "$AUTH" "$BASE/creds"               # every identity + password
+`}
+RULES:
+- 'since' is epoch MILLISECONDS captured just before you submit, so you never match
+  an older message.
+- found:false is normal. Do NOT resubmit the signup form because mail is slow —
+  wait, or use the target's own "resend" control.
+- Verification links are usually SINGLE-USE. Open in a browser; never fetch one
+  "to check" first, that burns it.
+- If the target rejects @${cfg.domain}, STOP and report. Do not retry with another
+  localpart or a plus-tag.
+- Email only. There is NO SMS capability.
+- Confirm the bug-bounty program permits self-registration before creating accounts.`;
+}
+
+function showAgent() {
+  if (!CUR) return;
+  const t = agentText(CUR);
+  $("#out").innerHTML = `<div class="card"><h3>Paste this to NEO / Claude Code</h3>
+    <pre>${esc(t)}</pre>
+    <button class="primary" style="margin-top:12px"
+      onclick="copy(${jsq(t)})">Copy block</button></div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Help
+// ══════════════════════════════════════════════════════════════════════
+function openHelp() {
+  const H = s => `<h3 style="margin:18px 0 6px">${s}</h3>`;
+  modal(`<h3 style="font-size:18px;margin:0">MAIL AUTO SIGNUP — how to use</h3>
+  <div class="note" style="margin-top:6px">
+    <b>${esc(cfg.domain)}</b> is a <b>catch-all</b> domain: every possible address already
+    receives mail, permanently, without being created first. There are no mailboxes to
+    provision — you invent an address and it works.
+  </div>
+
+  ${H("Flow A — this tool mints the identity")}
+  <div class="note">
+    <b>1.</b> <b>+ New account</b> → gives you an email + the fixed password.<br>
+    <b>2.</b> Sign up on the target with exactly those.<br>
+    <b>3.</b> Open the account → <b>Get CODE</b> (or <b>Get LINK</b>). It waits for the
+    mail to land, up to 240s.<br>
+    <b>4.</b> Later logins, re-verification and password resets: same buttons.
+  </div>
+
+  ${H("Flow B — you signed up manually in a browser")}
+  <div class="note">
+    <b>1.</b> Sign up with <i>anything</i>@${esc(cfg.domain)} — it already works.<br>
+    <b>2.</b> <b>Register existing</b> → record that email + password under a service.<br>
+    <b>3.</b> It now appears in the sidebar and can be handed to an agent.
+  </div>
+
+  ${H("⚡ Recent mail — usually all you need")}
+  <div class="note">
+    Every address at once, newest first, with the verification <b>code already extracted</b>
+    onto a green chip — click it to copy. <b>Poll now</b> refreshes; <b>Auto</b> polls every
+    10s and tells you when something new lands. Most of the time you never need to open an
+    account at all.
+  </div>
+
+  ${H("Programs vs services")}
+  <div class="note">
+    A <b>service</b> is one host you registered on (<i>seller-us.tiktok.com</i>).
+    A <b>program</b> is the bug-bounty programme that owns many of them (<i>TIKTOK</i>).
+    Tick accounts in the list → <b>Move to program…</b> to group them, so you can see
+    everything you already hold for a programme in one click.
+  </div>
+
+  ${H("Reading a message")}
+  <div class="note">
+    Click any row. <b>Rendered</b> shows the real HTML mail; <b>Plain text</b> and
+    <b>Raw MIME</b> are also there. It renders in a locked-down sandbox with scripts
+    disabled — mail is attacker-controlled, so it never touches this page.
+    <b>Remote images are blocked by default</b>: a tracking pixel would tell the sender
+    you opened it. Click <b>Load images</b> when you accept that.
+  </div>
+
+  ${H("When a code does not come out")}
+  <div class="note">
+    Numeric (<span class="mono">483920</span>), split (<span class="mono">704 812</span>)
+    and alphanumeric (<span class="mono">GNN93Y</span>) are extracted automatically.
+    If a message shows no chip, open it and read the body — the poll panel offers a
+    custom regex box where <b>group 1</b> is the code.
+  </div>
+
+  ${H("Delete means 'forget here'")}
+  <div class="note">
+    Deleting a credential removes it from this ledger only. The address keeps receiving
+    mail forever, and <b>the account you registered on the target still exists</b> —
+    delete that on the target's own site if you want it gone.
+  </div>
+
+  ${H("Rules that cost real accounts when ignored")}
+  <div class="note">
+    <b>1.</b> Confirm the program permits self-registration <i>before</i> creating accounts.
+    Reachability is not permission.<br>
+    <b>2.</b> If a target rejects @${esc(cfg.domain)}, <b class="bad">stop</b>. Don't retry
+    with another localpart or a plus-tag — every retry accelerates blocklisting, and if the
+    domain burns, every existing account on it becomes unrecoverable (no password resets).<br>
+    <b>3.</b> Never resubmit a signup form because mail is slow. Wait, or use the target's
+    own "resend".<br>
+    <b>4.</b> Verification links are usually <b>single-use</b> — open in the browser you
+    signed up with, don't fetch them first.<br>
+    <b>5.</b> Email only. <b>No SMS</b> — a phone-code flow cannot be completed.
+  </div>
+
+  ${H("Handing this to NEO or another AI")}
+  <div class="note">
+    An agent cannot run this file — it has no browser profile. Give it the HTTP API
+    instead. Open any account and press <b>NEO block</b> for a ready block scoped to that
+    account, or copy the generic one below. The same instructions are in an HTML comment
+    at the top of this file, so pasting the file itself also works.
+  </div>
+  <div class="row" style="margin-top:10px">
+    <button class="primary" onclick="copy(agentText())">Copy generic API block</button>
+  </div>
+
+  ${H("Endpoints")}
+  <pre style="max-height:170px">GET    ${esc(cfg.base)}/health                 no auth
+POST   ${esc(cfg.base)}/new?target=&lt;host&gt;
+GET    ${esc(cfg.base)}/code/&lt;email&gt;?wait=25&amp;since=&lt;ms&gt;&amp;pattern=&amp;contains=
+GET    ${esc(cfg.base)}/links/&lt;email&gt;?wait=25&amp;filter=verify
+GET    ${esc(cfg.base)}/recent?limit=50
+GET    ${esc(cfg.base)}/inbox/&lt;email&gt;?limit=10
+GET    ${esc(cfg.base)}/message/&lt;id&gt;?raw=1
+GET    ${esc(cfg.base)}/creds?target=&lt;substr&gt;
+POST   ${esc(cfg.base)}/assign   {addrs:[],program,target}
+DELETE ${esc(cfg.base)}/identity/&lt;email&gt;[?purge=1]
+DELETE ${esc(cfg.base)}/inbox/&lt;email&gt;</pre>
+  <div class="note" style="margin-top:8px">
+    All except /health need <span class="mono">Authorization: Bearer &lt;token&gt;</span>.
+    The token grants read access to <b>every inbox and every stored password</b>, and it is
+    embedded in this file — treat the file accordingly. Passwords are stored in plaintext;
+    disposable test accounts only.
+  </div>
+
+  <div class="row" style="margin-top:18px">
+    <button class="ghost" onclick="closeModal()">Close</button>
+  </div>`);
+}
+
+function openSettings() {
+  modal(`<h3>Settings</h3>
+    <label>API base</label><input id="sBase" value="${esc(cfg.base)}">
+    <label>Bearer token</label><input id="sToken" value="${esc(cfg.token)}">
+    <label>Catch-all domain</label><input id="sDomain" value="${esc(cfg.domain)}">
+    <label>Fixed password for new accounts</label><input id="sPass" value="${esc(PASSWORD)}">
+    <div class="note" style="margin-top:14px">
+      Saved in this browser's localStorage only. The token grants read access to
+      <b>every inbox and every stored password</b> — treat this file accordingly.
+    </div>
+    <div class="row" style="margin-top:16px">
+      <button class="primary" onclick="saveSettings()">Save</button>
+      <button class="ghost" onclick="closeModal()">Cancel</button>
+      <div class="spacer"></div>
+      <button class="danger ghost" onclick="localStorage.removeItem('myfoti');location.reload()">Reset</button>
+    </div>`);
+}
+
+function saveSettings() {
+  cfg.base = $("#sBase").value.trim();
+  cfg.token = $("#sToken").value.trim();
+  cfg.domain = $("#sDomain").value.trim();
+  cfg.password = PASSWORD = $("#sPass").value;
+  localStorage.setItem("myfoti", JSON.stringify(cfg));
+  closeModal();
+  load();
+}
+
+// ══════════════════════════════════════════════════════════════════════
+function modal(html) { $("#modal").innerHTML = html; $("#mask").classList.add("on"); }
+function closeModal() { $("#mask").classList.remove("on"); }
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+load();
+</script>
+</body>
+</html>
