@@ -367,8 +367,13 @@ async function load() {
   }
   $("#mCount").textContent = CREDS.length;
   renderServices();
-  CUR ? showAccount(CUR.email) : renderList();
+  // First load honours the URL; later refreshes keep you where you are.
+  if (!booted) { booted = true; applyRoute(); }
+  else if (CUR) showAccount(CUR.email);
+  else if (SVC === "__recent__") renderFeed();
+  else renderList();
 }
+let booted = false;
 
 // Two levels of grouping: PROGRAM (bug-bounty programme, e.g. TIKTOK) contains
 // SERVICES (individual hosts you registered on).
@@ -431,6 +436,66 @@ function renderServices() {
 function pickSvc(n) {
   pollGen++; SVC = n; CUR = null; renderServices();
   n === "__recent__" ? renderFeed() : (stopAuto(), renderList());
+  setRoute();
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Deep links — the URL always reflects what you are looking at, so a view
+//  can be handed to someone (or an agent) directly.
+//
+//    #service=gavekort.foodora.no
+//    #program=TIKTOK
+//    #account=bb-d46e2261@myfoti.com
+//    #view=recent | #view=all
+//
+//  Hash, not query string: a file:// page has origin "null", so
+//  history.pushState/replaceState with a URL throws SecurityError. The hash
+//  works identically local and hosted. ?service=… is also accepted on load
+//  for convenience when hosted.
+// ══════════════════════════════════════════════════════════════════════
+let routing = false;   // suppress the hashchange we cause ourselves
+
+function setRoute() {
+  let h = "view=all";
+  if (CUR) h = "account=" + encodeURIComponent(CUR.email);
+  else if (SVC === "__recent__") h = "view=recent";
+  else if (SVC.startsWith("p:")) h = "program=" + encodeURIComponent(SVC.slice(2));
+  else if (SVC.startsWith("s:")) h = "service=" + encodeURIComponent(SVC.slice(2));
+  if (location.hash.replace(/^#/, "") === h) return;
+  routing = true;
+  location.hash = h;
+  setTimeout(() => (routing = false), 0);
+}
+
+function applyRoute() {
+  const hp = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const qp = new URLSearchParams(location.search.replace(/^\?/, ""));
+  const get = k => hp.get(k) ?? qp.get(k);
+
+  const account = get("account");
+  if (account) {
+    const r = CREDS.find(x => x.email.toLowerCase() === account.toLowerCase());
+    if (r) { SVC = "s:" + (r.target || "(none)"); renderServices(); return showAccount(r.email); }
+    toast(`no account ${account} in the ledger`, true);
+  }
+  const service = get("service"), program = get("program"), view = get("view");
+  if (service) SVC = "s:" + service;
+  else if (program) SVC = "p:" + program;
+  else if (view === "recent") SVC = "__recent__";
+  else SVC = "__all__";
+
+  CUR = null;
+  renderServices();
+  SVC === "__recent__" ? renderFeed() : renderList();
+}
+
+window.addEventListener("hashchange", () => { if (!routing) applyRoute(); });
+
+function copyLink() {
+  copy(location.href);
+  toast(location.protocol === "file:"
+    ? "copied - note this is a local file:// path, only usable on this machine"
+    : "link copied");
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -572,6 +637,7 @@ function renderList() {
         <span style="color:var(--faint);font-weight:400">· ${rows.length}</span></h3>
       <div class="spacer"></div>
       <button class="sm" onclick="copyCreds()">⧉ Copy creds</button>
+      <button class="sm ghost" onclick="copyLink()" title="deep link to this view">🔗 Link</button>
       <button class="sm ghost" onclick="selectAll(${!allOn})">${allOn ? "clear" : "select"} all</button>
     </div>
     <div id="bulk"></div>
@@ -730,11 +796,12 @@ function showAccount(email) {
   CUR = r;
   $("#view").innerHTML = `
     <div class="row" style="margin-bottom:14px">
-      <button class="ghost" onclick="pollGen++;CUR=null;renderList()">← back</button>
+      <button class="ghost" onclick="pollGen++;CUR=null;renderList();setRoute()">← back</button>
       <div class="spacer"></div>
       <button class="primary" onclick="runPoll('code')">Get CODE</button>
       <button onclick="askLink()">Get LINK</button>
       <button onclick="loadAccountMail(CUR.email)">↻ Mail</button>
+      <button onclick="openEdit()">✎ Edit</button>
       <button onclick="showAgent()">NEO block</button>
       <button class="danger ghost" onclick="purge()">Purge inbox</button>
       <button class="danger ghost" onclick="delAccount()">Delete</button>
@@ -752,6 +819,7 @@ function showAccount(email) {
     </div>
     <div id="out"></div>
     <div id="mail"></div>`;
+  setRoute();
   loadAccountMail(r.email);   // never leave the panel empty
 }
 
@@ -976,6 +1044,69 @@ function drawMsg() {
       <button onclick="copy(${jsq(text)})">Copy text</button>
       <button class="ghost" onclick="closeModal()">Close</button>
     </div>`);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Edit one account
+// ══════════════════════════════════════════════════════════════════════
+function openEdit() {
+  if (!CUR) return;
+  const r = CUR;
+  const chips = (list, id) => list.length
+    ? `<div class="row" style="margin-top:6px">${list.map(n =>
+        `<button class="sm" onclick="$('#${id}').value=${jsq(n)}">${esc(n)}</button>`).join("")}</div>`
+    : "";
+  const svcs = [...new Set(CREDS.map(x => x.target).filter(Boolean))].sort();
+  const progs = [...new Set(CREDS.map(x => x.program).filter(Boolean))].sort();
+
+  modal(`<h3>Edit account</h3>
+    <div class="note">Email addresses cannot be changed — the address <i>is</i> the mailbox.
+      Everything else is just your own bookkeeping.</div>
+    <div class="kv" style="margin:12px 0">
+      <div class="k">EMAIL</div><div class="v">${esc(r.email)}</div>
+    </div>
+
+    <label>Service / host</label>
+    <input id="eTarget" value="${esc(r.target || "")}" placeholder="krafton.com">
+    ${chips(svcs, "eTarget")}
+    <div class="note" style="margin-top:6px">Rename this when you discover the real owner —
+      e.g. a <i>playinzoi.com</i> signup that turns out to be a shared Krafton SSO account
+      usable across their other sites.</div>
+
+    <label>Program</label>
+    <input id="eProgram" value="${esc(r.program || "")}" placeholder="KRAFTON">
+    ${chips(progs, "eProgram")}
+
+    <label>Password</label>
+    <input id="ePassword" value="${esc(r.password || "")}">
+
+    <label>Note</label>
+    <input id="eNote" value="${esc(r.note || "")}"
+           placeholder="role, plan, which sites this SSO account unlocks">
+
+    <div class="row" style="margin-top:16px">
+      <button class="primary" onclick="doEdit()">Save</button>
+      <button class="ghost" onclick="closeModal()">Cancel</button>
+    </div>`);
+  setTimeout(() => $("#eTarget") && $("#eTarget").focus(), 50);
+}
+
+async function doEdit() {
+  if (!CUR) return;
+  const email = CUR.email;
+  try {
+    await api("/assign", null, { method: "POST", body: {
+      addrs: [email],
+      target: $("#eTarget").value.trim(),
+      program: $("#eProgram").value.trim(),
+      password: $("#ePassword").value,
+      note: $("#eNote").value.trim(),
+    }});
+  } catch (e) { return toast(e.message, true); }
+  toast("saved");
+  closeModal();
+  await load();
+  showAccount(email);
 }
 
 function delAccount() {
